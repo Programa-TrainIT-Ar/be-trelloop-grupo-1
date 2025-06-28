@@ -1,0 +1,160 @@
+# ====================
+# 📦 General
+# ====================
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+*.bak
+*.tmp
+*.pid
+
+# ====================
+# ⚙️ Python (Flask Backend)
+# ====================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.python-version
+
+# Conda
+conda-meta/
+*.conda
+*.ipynb_checkpoints
+*.lock
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Flask
+instance/
+*.db
+*.sqlite3
+
+# JWT secrets / keys
+*.pem
+*.key
+
+# Swagger/OpenAPI (if generated)
+swagger.json
+swagger.yaml
+
+# ====================
+# 🧩 Node.js (React/Next.js Frontend)
+# ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js build outputs
+.next/
+out/
+
+# TailwindCSS generated files (optional, if any)
+*.css.map
+
+# Build outputs
+build/
+dist/
+.cache/
+tmp/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# ====================
+# 🗃️ Databases / Storage
+# ====================
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.psql
+
+# PostgreSQL
+*.pgsql
+*.pgdata
+pgdata/
+*.pid
+
+# ====================
+# 🔒 Security / Secrets
+# ====================
+secrets.*
+credentials.*
+config.secret.*
+*.env.local
+*.env.development.local
+*.env.production.local
+
+# ====================
+# ⚙️ OS / Editor Configs
+# ====================
+# macOS
+.DS_Store
+
+# Windows
+ehthumbs.db
+Icon?
+Thumbs.db
+Desktop.ini
+
+# VSCode
+.vscode/
+.history/
+
+# JetBrains IDEs
+.idea/
+
+# ====================
+# 🧪 Testing / Coverage
+# ====================
+coverage/
+htmlcov/
+.tox/
+.nox/
+pytest_cache/
+.cache/
+.pytest_cache/
+*.cover
+*.coverage
+*.lcov
+nosetests.xml
+coverage.xml
+test-results.xml
+
+# ====================
+# 📦 Package Managers
+# ====================
+Pipfile.lock
+poetry.lock
+poetry.toml
+
+# ====================
+# 🧠 Misc
+# ====================
+*.iml
+*.sublime*
+*.bak
+
+# Docker
+*.container
+*.pid
+*.sock
+docker-compose.override.yml
