@@ -9,7 +9,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 CORS(app, origins=CORS_ORIGINS)
 db.init_app(app)
 
-@app.route("/message", methods=["POST"])
 def post_message():
      data = request.json
      msg = Message(content=data["content"])
