@@ -3,11 +3,14 @@ from flask_cors import CORS
 from .config import DATABASE_URL, CORS_ORIGINS
 from .database import db
 from .models import Message
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 CORS(app, origins=CORS_ORIGINS)
 db.init_app(app)
+
+migrate = Migrate(app, db)
 
 def post_message():
      data = request.json
