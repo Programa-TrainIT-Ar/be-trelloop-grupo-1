@@ -8,11 +8,14 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/login", methods = ["POST", "GET"])
 def iniciar_sesion():
     body = request.json
+    print("user test")
     correo = body.get("correo", None)
     contrasena = body.get("contrasena", None)
 
-    usuario = User.query.filter_by(correo = coreo).first()
+    usuario = Usuario.query.filter_by(correo = correo).first()
+    
     if usuario is None:
+        
         return jsonify("El usuario no existe"), 404
     else:
         try:
