@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 import re
 from .database import db
-from .models import Usuario, verificar_contrasena
+from .models import Usuario
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -13,9 +13,9 @@ def iniciar_sesion():
     contrasena = body.get("contrasena", None)
 
     usuario = Usuario.query.filter_by(correo = correo).first()
-    
+
     if usuario is None:
-        
+
         return jsonify("El usuario no existe"), 404
     else:
         try:
@@ -26,6 +26,5 @@ def iniciar_sesion():
         except Exception as error:
             return jsonify("Error"), 500
 
-    pass
     if not correo or not contrasena:
         return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
