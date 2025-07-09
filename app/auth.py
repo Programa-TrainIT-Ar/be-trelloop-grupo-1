@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify
-import re
-from .database import db
-from .models import Usuario
+from flask_bcrypt import Bcrypt
+from .models import db, Usuario
+
+auth_bp = Blueprint("auth", __name__)
+bcrypt = Bcrypt()
+
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -16,44 +19,49 @@ def iniciar_sesion():
         return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
 
 @auth_bp.route("/register", methods=["POST"])
-def registrar_usuario():
-    
-    # 1. Obtener datos del request
-    data = request.get_json()
+def register():
+    try:
+        data = request.get_json()
 
-    nombre = data.get("nombre")
-    apellido = data.get("apellido")
-    correo = data.get("correo")
-    contrasena = data.get("contrasena")
+        name = data.get("name")
+        email = data.get("email")
+        password = data.get("password")
 
-    # 2. Validar campos vacíos
-    if not nombre or not apellido or not correo or not contrasena:
-        return jsonify({"ERROR": "Todos los campos son obligatorios"}), 400
+        # Validaciones básicas
+        if not name or not email or not password:
+            return jsonify({"error": "Todos los campos (name, email, password) son obligatorios."}), 400
 
-    # 3. Validar formato de correo
-    email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-    if not re.match(email_regex, correo):
-        return jsonify({"ERROR": "Correo inválido"}), 400
+        if "@" not in email or "." not in email:
+            return jsonify({"error": "Formato de correo inválido."}), 400
 
-    # 4. Verificar si el correo ya está registrado
-    usuario_existente = Usuario.query.filter_by(correo=correo).first()
-    if usuario_existente:
-        return jsonify({"ERROR": "El correo ya está registrado"}), 400
+        if len(password) < 6:
+            return jsonify({"error": "La contraseña debe tener al menos 6 caracteres."}), 400
 
-    # 5. Crear usuario
-    nuevo_usuario = Usuario(
-        nombre=nombre,
-        apellido=apellido,
-        correo=correo
-    )
-    nuevo_usuario.guarda_contasena(contrasena)
+        # Verificar si usuario ya existe
+        existing_user = Usuario.query.filter_by(email=email).first()
+        if existing_user:
+            return jsonify({"error": "El correo ya está registrado. Intenta con otro correo."}), 409
 
-    # 6. Guardar en la base de datos
-    db.session.add(nuevo_usuario)
-    db.session.commit()
+        # Encriptar contraseña
+        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
 
-    # 7. Devolver respuesta
-    return jsonify({
-        "mensaje": "Usuario registrado exitosamente",
-        "usuario": nuevo_usuario.serialize()
-    }), 201
+        # Crear nuevo usuario
+        new_user = Usuario(
+            name=name,
+            email=email,
+            password=hashed_password,
+            is_active=True
+        )
+
+        # Guardar en la base de datos
+        db.session.add(new_user)
+        db.session.commit()
+
+        # Respuesta exitosa
+        return jsonify({"message": "Registro exitoso", "user_id": new_user.id}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print("Error en el registro:", e)
+        return jsonify({"error": str(e)}), 500
+
