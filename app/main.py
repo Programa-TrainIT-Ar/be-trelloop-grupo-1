@@ -4,11 +4,14 @@ from .config import DATABASE_URL, CORS_ORIGINS
 from .database import db
 from .models import Message
 from flask_migrate import Migrate
+from .auth import auth_bp
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 CORS(app, origins=CORS_ORIGINS)
 db.init_app(app)
+
+app.register_blueprint(auth_bp, url_prefix="/auth")
 
 migrate = Migrate(app, db)
 
