@@ -11,6 +11,8 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 CORS(app, origins=CORS_ORIGINS)
 db.init_app(app)
 
+app.register_blueprint(auth_bp, url_prefix="/auth")
+
 migrate = Migrate(app, db)
 app.register_blueprint(auth_bp)
 
