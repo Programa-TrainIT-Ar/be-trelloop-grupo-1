@@ -7,6 +7,7 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/login", methods = ["POST", "GET"])
 def iniciar_sesion():
+
     try:
         body = request.json
     
@@ -32,6 +33,6 @@ def iniciar_sesion():
         
 
 
-    pass
+
     if not correo or not contrasena:
         return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
