@@ -5,7 +5,7 @@ from .models import Usuario
 
 auth_bp = Blueprint("auth", __name__)
 
-@auth_bp.route("/login", methods = ["POST", "GET"])
+@auth_bp.route("/login", methods = ["POST"])
 def iniciar_sesion():
     try:
         body = request.json
