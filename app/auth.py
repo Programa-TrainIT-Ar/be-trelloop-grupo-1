@@ -47,3 +47,53 @@ def iniciar_sesion():
         print(f"Error en login: {str(error)}")
         # Retornar error genérico al cliente por seguridad
         return jsonify({"error": "Error interno del servidor"}), 500
+
+@auth_bp.route("/register", methods=["POST"])
+@cross_origin()
+def registrar_usuario():
+    try:
+        body = request.json
+
+        # Validar que el body existe
+        if not body:
+            return jsonify({"error": "Datos incompletos"}), 400
+
+        nombre = body.get("nombre")
+        apellido = body.get("apellido")
+        correo = body.get("correo")
+        contrasena = body.get("contrasena")
+
+        # Validaciones básicas
+        if not nombre or not apellido or not correo or not contrasena:
+            return jsonify({"error": "Todos los campos son requeridos"}), 400
+
+        # Validar formato del correo
+        patron_correo = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        if not re.match(patron_correo, correo):
+            return jsonify({"error": "Correo inválido"}), 400
+
+        # Verificar si ya existe el usuario
+        usuario_existente = Usuario.query.filter_by(correo=correo).first()
+        if usuario_existente:
+            return jsonify({"error": "El correo ya está registrado"}), 409
+
+        # Crear el nuevo usuario
+        nuevo_usuario = Usuario(
+            nombre=nombre,
+            apellido=apellido,
+            correo=correo
+        )
+        nuevo_usuario.set_contrasena(contrasena)
+
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+
+        return jsonify({
+            "mensaje": "Usuario registrado exitosamente",
+            "usuario": nuevo_usuario.serialize()
+        }), 201
+
+    except Exception as e:
+        print(f"Error en el registro: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
