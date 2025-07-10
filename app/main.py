@@ -14,7 +14,9 @@ db.init_app(app)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 
 migrate = Migrate(app, db)
+app.register_blueprint(auth_bp)
 
+@app.route("/message", methods=["POST"])
 def post_message():
      data = request.json
      msg = Message(content=data["content"])
@@ -30,4 +32,4 @@ def get_messages():
 if __name__ == "__main__":
      with app.app_context():
           db.create_all()
-     app.run(host="0.0.0.0", port=5000)
+     app.run(host="0.0.0.0", port=5002)
