@@ -12,7 +12,7 @@ def iniciar_sesion():
         body = request.json
     
         correo = body.get("correo", None)
-        print(correo)
+        
         contrasena = body.get("contrasena", None)
 
         usuario = Usuario.query.filter_by(correo = correo).first()
