@@ -11,9 +11,9 @@ class Usuario(db.Model):
     nombre = db.Column(db.String(70), unique=False, nullable=False)
     apellido = db.Column(db.String(70), unique=False, nullable=False)
     correo = db.Column(db.String(255), unique=True,nullable=False)
-    contrasena_hashada = db.Column(db.String(255))    
+    contrasena_hashada = db.Column(db.String(255))
 
-    def guarda_contasena(self, contrasena):
+    def guarda_contrasena(self, contrasena):
         #Se guarda contraseña encriptada
         contrasena_en_bytes = contrasena.encode("utf-8")
         sal = bcrypt.gensalt()
@@ -25,7 +25,7 @@ class Usuario(db.Model):
         if not self.contrasena_hashada:
             return False
         return bcrypt.checkpw(contrasena.encode("utf-8"), self.contrasena_hashada.encode("utf-8"))
-    
+
     def serialize(self):
         # Convierte una instancia de la clase en un diccionario de Python para enviarlo como respuesta a solicitudes de la API.
         return {
@@ -33,7 +33,5 @@ class Usuario(db.Model):
             "nombre": self.nombre,
             "apellido": self.apellido,
             "correo": self.correo
-            # No incluir la contraseña. Es una brecha de seguridad. 
+            # No incluir la contraseña. Es una brecha de seguridad.
         }
-             
-        

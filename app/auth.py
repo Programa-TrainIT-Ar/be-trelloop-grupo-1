@@ -16,32 +16,34 @@ def handle_options_request():
 @auth_bp.route("/login", methods = ["POST"])
 @cross_origin()
 def iniciar_sesion():
-
     try:
         body = request.json
-    
+
+         # Validar que el body existe
+        if not body:
+            return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
+
         correo = body.get("correo", None)
-        
+
         contrasena = body.get("contrasena", None)
 
+        if not correo or not contrasena:
+            return jsonify({"error": "Correo y contraseña son requeridos"}), 400
+
         usuario = Usuario.query.filter_by(correo = correo).first()
-        
+
         if usuario is None:
-            
-            return jsonify("El usuario no existe"), 404
+            return jsonify({"error": "El usuario no existe"}), 404
+
+        if usuario.verificar_contrasena(contrasena):
+            return jsonify({
+                "mensaje": "Login exitoso",
+                "usuario": usuario.serialize()
+            }), 200
         else:
-            try:
-                if usuario.verificar_contrasena(contrasena):
-                    return jsonify({"usuario": usuario.serialize()}), 200
-                else:
-                    return jsonify("Credenciales incorrectas"), 404
-            except Exception as error:
-                return jsonify("Error"), 500
+            # Contraseña incorrecta
+            return jsonify({"error": "Credenciales incorrectas"}), 401
     except Exception as error:
-        return jsonify("Error"), 500
-        
-
-
-
-    if not correo or not contrasena:
-        return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
+        print(f"Error en login: {str(error)}")
+        # Retornar error genérico al cliente por seguridad
+        return jsonify({"error": "Error interno del servidor"}), 500
