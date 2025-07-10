@@ -15,6 +15,11 @@ app.register_blueprint(auth_bp, url_prefix="/auth")
 
 migrate = Migrate(app, db)
 
+@app.before_request
+def handle_options_request():
+    if request.method == 'OPTIONS':
+        return '', 204
+
 def post_message():
      data = request.json
      msg = Message(content=data["content"])
