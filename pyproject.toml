@@ -1,0 +1,15 @@
+[project]
+name = "be-trelloop-grupo-1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bcrypt>=4.3.0",
+    "dotenv>=0.9.9",
+    "flask>=3.1.1",
+    "flask-cors>=6.0.1",
+    "flask-sqlalchemy>=3.1.1",
+    "flask-migrate>=4.0.0",
+    "psycopg2-binary>=2.9.5",
+]
