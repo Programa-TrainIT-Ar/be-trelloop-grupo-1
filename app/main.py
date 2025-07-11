@@ -14,7 +14,7 @@ db.init_app(app)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 
 migrate = Migrate(app, db)
-app.register_blueprint(auth_bp)
+
 
 @app.before_request
 def handle_options_request():
