@@ -5,6 +5,8 @@ from .database import db, inicializar_base_de_datos
 from .models import Message
 from flask_migrate import Migrate
 from .auth import auth_bp
+from flask_jwt_extended import JWTManager
+from datetime import timedelta
 
 app = Flask(__name__)
 
@@ -16,6 +18,11 @@ CORS(app, origins=CORS_ORIGINS, supports_credentials=True)
 db = inicializar_base_de_datos(app)
 
 migrate = Migrate(app, db)
+
+
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+jwt = JWTManager(app)
 
 # Estaba repetido el blueprint, asi que lo eliminamos y dejamos este.
 app.register_blueprint(auth_bp, url_prefix="/auth")

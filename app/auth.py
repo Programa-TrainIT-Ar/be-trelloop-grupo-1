@@ -3,6 +3,8 @@ from flask_cors import CORS, cross_origin
 import re
 from .database import db
 from .models import Usuario
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from werkzeug.security import generate_password_hash, check_password_hash
 
 auth_bp = Blueprint("auth", __name__)
 CORS(auth_bp)
@@ -41,8 +43,13 @@ def iniciar_sesion():
                 "usuario": usuario.serialize()
             }), 200
         else:
-            # Contraseña incorrecta
-            return jsonify({"error": "Credenciales incorrectas"}), 401
+           if check_password_hash(usuario.contrasena, contrasena):
+                access_token=create_access_token(identity=usuario.id)
+                return jsonify({
+                    "mensaje": "Login exitoso",
+                    "usuario": usuario.serialize(),
+                    "access_token": access_token
+                }), 200
     except Exception as error:
         print(f"Error en login: {str(error)}")
         # Retornar error genérico al cliente por seguridad
@@ -58,10 +65,10 @@ def registrar_usuario():
         if not body:
             return jsonify({"error": "Datos incompletos"}), 400
 
-        nombre = body.get("nombre")
-        apellido = body.get("apellido")
-        correo = body.get("correo")
-        contrasena = body.get("contrasena")
+        nombre = body.get("nombre",None)
+        apellido = body.get("apellido",None)
+        correo = body.get("correo",None)
+        contrasena = body.get("contrasena",None)
 
         # Validaciones básicas
         if not nombre or not apellido or not correo or not contrasena:
