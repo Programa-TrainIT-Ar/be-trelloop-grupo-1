@@ -4,7 +4,6 @@ import re
 from .database import db
 from .models import Usuario
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
-from werkzeug.security import generate_password_hash, check_password_hash
 
 auth_bp = Blueprint("auth", __name__)
 CORS(auth_bp)
@@ -38,18 +37,14 @@ def iniciar_sesion():
             return jsonify({"error": "El usuario no existe"}), 404
 
         if usuario.verificar_contrasena(contrasena):
+            access_token=create_access_token(identity=usuario.id)
             return jsonify({
                 "mensaje": "Login exitoso",
-                "usuario": usuario.serialize()
+                "usuario": usuario.serialize(),
+                "access_token": access_token
             }), 200
         else:
-           if check_password_hash(usuario.contrasena, contrasena):
-                access_token=create_access_token(identity=usuario.id)
-                return jsonify({
-                    "mensaje": "Login exitoso",
-                    "usuario": usuario.serialize(),
-                    "access_token": access_token
-                }), 200
+            return jsonify({"error":"Contraseña incorrecta"}),401
     except Exception as error:
         print(f"Error en login: {str(error)}")
         # Retornar error genérico al cliente por seguridad
