@@ -50,7 +50,7 @@ def iniciar_sesion():
         # Retornar error genérico al cliente por seguridad
         return jsonify({"error": "Error interno del servidor"}), 500
 
-@auth_bp.route("/register", methods=["POST"])
+@auth_bp.route("/registro", methods=["POST"])
 @cross_origin()
 def registrar_usuario():
     try:
@@ -69,10 +69,18 @@ def registrar_usuario():
         if not nombre or not apellido or not correo or not contrasena:
             return jsonify({"error": "Todos los campos son requeridos"}), 400
 
+        # Validación de longitud del nombre y apellido
+        if len(nombre) < 2 or len(apellido) < 2:
+            return jsonify({"error": "Nombre y apellido deben tener al menos 2 caracteres"}), 400
+
         # Validar formato del correo
-        patron_correo = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        patron_correo = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(patron_correo, correo):
             return jsonify({"error": "Correo inválido"}), 400
+
+        # Validación de seguridad de contraseña
+        if len(contrasena) < 8:
+            return jsonify({"error": "La contraseña debe tener al menos 8 caracteres"}), 400
 
         # Verificar si ya existe el usuario
         usuario_existente = Usuario.query.filter_by(correo=correo).first()
@@ -85,10 +93,13 @@ def registrar_usuario():
             apellido=apellido,
             correo=correo
         )
-        nuevo_usuario.set_contrasena(contrasena)
+        nuevo_usuario.guarda_contrasena(contrasena)
 
         db.session.add(nuevo_usuario)
         db.session.commit()
+
+        # Generar token JWT para login automático
+        access_token = create_access_token(identity=nuevo_usuario.id)
 
         return jsonify({
             "mensaje": "Usuario registrado exitosamente",
@@ -99,3 +110,21 @@ def registrar_usuario():
         print(f"Error en el registro: {str(e)}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
+# Ejemplo de ruta protegida con JWT
+@auth_bp.route("/perfil", methods=["GET"])
+@jwt_required()
+def obtener_perfil():
+    # Obtener el ID del usuario desde el token JWT
+    usuario_id = get_jwt_identity()
+
+    # Buscar el usuario en la base de datos
+    usuario = Usuario.query.get(usuario_id)
+
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # Devolver los datos del usuario
+    return jsonify({
+        "mensaje": "Perfil obtenido correctamente",
+        "usuario": usuario.serialize()
+    }), 200

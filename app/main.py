@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from .config import DATABASE_URL, CORS_ORIGINS, DEBUG
+from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY
 from .database import db, inicializar_base_de_datos
 from .models import Message
 from flask_migrate import Migrate
@@ -20,7 +20,7 @@ db = inicializar_base_de_datos(app)
 migrate = Migrate(app, db)
 
 
-app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 jwt = JWTManager(app)
 
