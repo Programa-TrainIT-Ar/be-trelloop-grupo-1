@@ -7,7 +7,6 @@ from flask_migrate import Migrate
 from .auth import auth_bp
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
-import boto3
 import os
 
 app = Flask(__name__)
@@ -30,6 +29,7 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
+
 
 # Callback para cargar el usuario desde el token JWT
 @jwt.user_lookup_loader
@@ -62,26 +62,6 @@ def post_message():
 def get_messages():
      msgs = Message.query.all()
      return jsonify([{"id": m.id, "content": m.content} for m in msgs])
-
-
-#TABLEROS-------------------------------------------------------------------------------------------------------
-
-@app.route("/createBoard", methods=["POST"])
-def create_board():
-     data = request.json
-     new_board = Board(
-          name=data["name"],
-          description=data.get("description", ""),
-          image=data.get("image", ""),
-          creation_date=datetime.utcnow(),
-          user_id=data["user_id"]
-     )
-     db.session.add(new_board)
-     db.session.commit()
-     return jsonify({"id": new_board.id, "name": new_board.name}), 201
-
-
-
 
 
 
