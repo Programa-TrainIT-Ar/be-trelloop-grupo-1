@@ -2,8 +2,11 @@ from flask import Blueprint, request, jsonify
 from flask_cors import CORS, cross_origin
 import re
 from .database import db
-from .models import Usuario
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from .models import User
+from flask_jwt_extended import (
+    create_access_token, create_refresh_token,
+    jwt_required, get_jwt_identity
+)
 
 auth_bp = Blueprint("auth", __name__)
 CORS(auth_bp)
@@ -16,115 +19,150 @@ def handle_options_request():
 
 @auth_bp.route("/login", methods = ["POST"])
 @cross_origin()
-def iniciar_sesion():
+def login():
     try:
         body = request.json
 
-         # Validar que el body existe
+         # Valida que el body existe
         if not body:
             return jsonify({"ERROR": "Correo o contraseña invalidos"}), 400
 
-        correo = body.get("correo", None)
+        email = body.get("email", None)
 
-        contrasena = body.get("contrasena", None)
+        password = body.get("password", None)
 
-        if not correo or not contrasena:
+        if not email or not password:
             return jsonify({"error": "Correo y contraseña son requeridos"}), 400
 
-        usuario = Usuario.query.filter_by(correo = correo).first()
+        user = User.query.filter_by(email=email).first()
 
-        if usuario is None:
+        if user is None:
             return jsonify({"error": "El usuario no existe"}), 404
 
-        if usuario.verificar_contrasena(contrasena):
-            access_token=create_access_token(identity=usuario.id)
+        if user.verify_password(password):
+            # Genera el token de acceso con Flask-JWT-Extended
+            access_token = create_access_token(identity=user.id)
+            refresh_token = create_refresh_token(identity=user.id)
+
             return jsonify({
                 "mensaje": "Login exitoso",
-                "usuario": usuario.serialize(),
-                "access_token": access_token
+                "usuario": user.serialize(),
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "Bearer"
             }), 200
         else:
-            return jsonify({"error":"Contraseña incorrecta"}),401
+            # Contraseña incorrecta
+            return jsonify({"error": "Credenciales incorrectas"}), 401
     except Exception as error:
-        print(f"Error en login: {str(error)}")
-        # Retornar error genérico al cliente por seguridad
+        print(f"Error in login: {str(error)}")
+        # Retorna un error genérico al cliente por seguridad
         return jsonify({"error": "Error interno del servidor"}), 500
 
-@auth_bp.route("/registro", methods=["POST"])
+@auth_bp.route("/refresh", methods=["POST"])
 @cross_origin()
-def registrar_usuario():
+@jwt_required(refresh=True)
+def refresh_token():
+    """
+    Renueva el token de acceso usando un token de refresco válido.
+    """
+    try:
+        # Obtiene el ID del usuario del token de refresco
+        user_id = get_jwt_identity()
+
+        # Encuentra al usuario
+        user = User.query.get(int(user_id))
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        # Genera un nuevo token de acceso
+        new_access_token = create_access_token(identity=user_id)
+
+        return jsonify({
+            "access_token": new_access_token,
+            "token_type": "Bearer"
+        }), 200
+
+    except Exception as e:
+        print(f"Error refreshing token: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500
+
+@auth_bp.route("/register", methods=["POST"])
+@cross_origin()
+def register_user():
     try:
         body = request.json
 
-        # Validar que el body existe
+        # Valida que el body existe
         if not body:
             return jsonify({"error": "Datos incompletos"}), 400
 
-        nombre = body.get("nombre",None)
-        apellido = body.get("apellido",None)
-        correo = body.get("correo",None)
-        contrasena = body.get("contrasena",None)
+        first_name = body.get("firstName")
+        last_name = body.get("lastName")
+        email = body.get("email")
+        password = body.get("password")
 
         # Validaciones básicas
-        if not nombre or not apellido or not correo or not contrasena:
+        if not first_name or not last_name or not email or not password:
             return jsonify({"error": "Todos los campos son requeridos"}), 400
 
-        # Validación de longitud del nombre y apellido
-        if len(nombre) < 2 or len(apellido) < 2:
-            return jsonify({"error": "Nombre y apellido deben tener al menos 2 caracteres"}), 400
-
-        # Validar formato del correo
-        patron_correo = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-        if not re.match(patron_correo, correo):
+        # Valida el formato del correo
+        email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        if not re.match(email_pattern, email):
             return jsonify({"error": "Correo inválido"}), 400
 
-        # Validación de seguridad de contraseña
-        if len(contrasena) < 8:
-            return jsonify({"error": "La contraseña debe tener al menos 8 caracteres"}), 400
-
-        # Verificar si ya existe el usuario
-        usuario_existente = Usuario.query.filter_by(correo=correo).first()
-        if usuario_existente:
+        # Verifica si el usuario ya existe
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
             return jsonify({"error": "El correo ya está registrado"}), 409
 
-        # Crear el nuevo usuario
-        nuevo_usuario = Usuario(
-            nombre=nombre,
-            apellido=apellido,
-            correo=correo
+        # Crea el nuevo usuario
+        new_user = User(
+            first_name=first_name,
+            last_name=last_name,
+            email=email
         )
-        nuevo_usuario.guarda_contrasena(contrasena)
+        new_user.set_password(password)
 
-        db.session.add(nuevo_usuario)
+        db.session.add(new_user)
         db.session.commit()
 
-        # Generar token JWT para login automático
-        access_token = create_access_token(identity=nuevo_usuario.id)
+        # Genera tokens para el usuario recién registrado con Flask-JWT-Extended
+        access_token = create_access_token(identity=new_user.id)
+        refresh_token = create_refresh_token(identity=new_user.id)
 
         return jsonify({
             "mensaje": "Usuario registrado exitosamente",
-            "usuario": nuevo_usuario.serialize()
+            "usuario": new_user.serialize(),
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "Bearer"
         }), 201
 
     except Exception as e:
-        print(f"Error en el registro: {str(e)}")
+        print(f"Error in registration: {str(e)}")
         return jsonify({"error": "Error interno del servidor"}), 500
 
-# Ejemplo de ruta protegida con JWT
-@auth_bp.route("/perfil", methods=["GET"])
+@auth_bp.route("/me", methods=["GET"])
+@cross_origin()
 @jwt_required()
-def obtener_perfil():
-    # Obtener el ID del usuario desde el token JWT
-    usuario_id = get_jwt_identity()
+def get_user_profile():
+    """
+    Obtiene el perfil del usuario autenticado.
+    Esta ruta está protegida por el decorador jwt_required.
+    """
+    try:
+        # Obtiene el ID del usuario desde el token
+        user_id = get_jwt_identity()
 
-    # Buscar el usuario en la base de datos
-    usuario = Usuario.query.get(usuario_id)
+        # Busca el usuario en la base de datos
+        user = User.query.get(int(user_id))
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
 
-    if not usuario:
-        return jsonify({"error": "Usuario no encontrado"}), 404
-
-    # Devolver los datos del usuario
-    return jsonify({
-        "mensaje": "Perfil obtenido correctamente",
-        "usuario": usuario.serialize()
-    }), 200
+        return jsonify({
+            "usuario": user.serialize()
+        }), 200
+    except Exception as e:
+        print(f"Error al obtener el perfil de usuario: {str(e)}")
+        return jsonify({"error": "Error interno del servidor"}), 500

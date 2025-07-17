@@ -13,5 +13,4 @@ dependencies = [
     "flask-migrate>=4.0.0",
     "flask-jwt-extended>=4.5.2",
     "psycopg2-binary>=2.9.5",
-    "sqlalchemy>=2.0.0",         # Para compatibilidad con PostgreSQL
 ]
