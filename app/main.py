@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY
 from .database import db, inicializar_base_de_datos
@@ -7,6 +7,8 @@ from flask_migrate import Migrate
 from .auth import auth_bp
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
+import boto3
+import os
 
 app = Flask(__name__)
 
@@ -23,6 +25,8 @@ migrate = Migrate(app, db)
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 jwt = JWTManager(app)
+
+s3 = boto3.resource("s3")
 
 # Estaba repetido el blueprint, asi que lo eliminamos y dejamos este.
 app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -48,6 +52,24 @@ def get_messages():
 
 
 #TABLEROS-------------------------------------------------------------------------------------------------------
+
+@app.route("/createBoard", methods=["POST"])
+def create_board():
+     data = request.json
+     new_board = Board(
+          name=data["name"],
+          description=data.get("description", ""),
+          image=data.get("image", ""),
+          creation_date=datetime.utcnow(),
+          user_id=data["user_id"]
+     )
+     db.session.add(new_board)
+     db.session.commit()
+     return jsonify({"id": new_board.id, "name": new_board.name}), 201
+
+
+
+
 
 
 
