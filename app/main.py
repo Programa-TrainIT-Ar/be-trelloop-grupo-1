@@ -1,12 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
-from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY
-from .database import db, inicializar_base_de_datos
-from .models import Message
+from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
+from .database import db, initialize_database
+from .models import Message, User
 from flask_migrate import Migrate
 from .auth import auth_bp
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
+import os
 
 app = Flask(__name__)
 
@@ -15,14 +16,30 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["DEBUG"] = DEBUG
 
 CORS(app, origins=CORS_ORIGINS, supports_credentials=True)
-db = inicializar_base_de_datos(app)
+initialize_database(app)
 
 migrate = Migrate(app, db)
 
 
+# Configuración de JWT
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(seconds=JWT_ACCESS_TOKEN_EXPIRES)
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(seconds=JWT_REFRESH_TOKEN_EXPIRES)
+app.config['JWT_TOKEN_LOCATION'] = ['headers']
+app.config['JWT_HEADER_NAME'] = 'Authorization'
+app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
+
+
+# Callback para cargar el usuario desde el token JWT
+@jwt.user_lookup_loader
+def user_lookup_callback(_jwt_header, jwt_data):
+    """
+    Función que carga el usuario a partir del token JWT.
+    Se ejecuta automáticamente cuando se usa @jwt_required()
+    """
+    identity = jwt_data["sub"]
+    return User.query.filter_by(id=identity).one_or_none()
 
 # Estaba repetido el blueprint, asi que lo eliminamos y dejamos este.
 app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -45,6 +62,9 @@ def post_message():
 def get_messages():
      msgs = Message.query.all()
      return jsonify([{"id": m.id, "content": m.content} for m in msgs])
+
+
+
 
 if __name__ == "__main__":
      with app.app_context():
