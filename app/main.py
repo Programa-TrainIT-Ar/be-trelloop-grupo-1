@@ -4,9 +4,10 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
-from .models import Message, User
+from .models import Message, User, Board, Tag
 from .auth import auth_bp
 from .board import board_bp
+from .tag import tag_bp
 from datetime import timedelta
 import os
 
@@ -45,6 +46,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
 # Blueprint para relacionar archico principal con el manejo de autenticación y tableros
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(board_bp, url_prefix="/board")
+app.register_blueprint(tag_bp, url_prefix="/tag")
 
 
 @app.before_request
