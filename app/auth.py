@@ -8,6 +8,8 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity
 )
 
+# Rama grupo 1
+
 auth_bp = Blueprint("auth", __name__)
 CORS(auth_bp)
 
