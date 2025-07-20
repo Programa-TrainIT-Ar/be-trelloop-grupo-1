@@ -5,6 +5,11 @@ from .models import db, User, Board, Tag
 import uuid
 import boto3
 import base64
+from flask_cors import CORS, cross_origin
+from flask_jwt_extended import (
+    create_access_token, create_refresh_token,
+    jwt_required, get_jwt_identity
+)
 
 # Para utilizar S3 de AWS instalar Boto3 con el siguiente comando:
 # pipenv install boto3
@@ -100,7 +105,7 @@ def create_board():
 def get_boards():
     try:
         user_id= get_jwt_identity()
-        # Verificar si el usuario existe    
+    
     # Obtener todos los tableros
         boards=Board.query.all()
         return jsonify([board.serialize() for board in boards]), 200
