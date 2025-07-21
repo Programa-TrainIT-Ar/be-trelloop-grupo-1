@@ -6,14 +6,10 @@ from .models import db, User, Board, Tag
 import uuid
 import boto3
 import base64
-from flask_cors import CORS, cross_origin
-from flask_jwt_extended import (
-    create_access_token, create_refresh_token,
-    jwt_required, get_jwt_identity
-)
 
-# Para utilizar S3 de AWS instalar Boto3 con el siguiente comando:
-# pipenv install boto3
+board_bp = Blueprint("board", __name__)
+
+# Para utilizar S3 de AWS instalar Boto3 con el siguiente comando: pipenv install boto3
 # Configuración de S3
 s3 = boto3.client("s3")
 BUCKET_NAME = "trainit404"
@@ -39,34 +35,28 @@ def upload_image_to_s3(base64_image, filename):
 @jwt_required()
 def create_board():
     try:
-        # Recibes los datos de texto desde request.form
-        name = request.form.get("name")
-        description = request.form.get("description", "")
-        user_id = request.form.get("user_id")
-        is_public = request.form.get("isPublic", "false").lower() == "true"
-
-        # Verificar usuario
-        user = User.query.get(user_id)
+        # Obtener ID del usuario actual desde el JWT
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Recibes el archivo imagen (input name="image")
+        # Recibir datos del formulario
+        name = request.form.get("name")
+        description = request.form.get("description", "")
+        is_public = request.form.get("isPublic", "false").lower() == "true"
+
+        # Recibir archivo de imagen
         image_file = request.files.get("image")
         image_url = None
 
         if image_file:
-            # Generar nombre único para la imagen
-            filename = f"boards/{uuid.uuid4().hex}.png"
-
-            # Convertir archivo a bytes y subir a S3
             try:
-                s3.upload_fileobj(
-                    image_file,
-                    BUCKET_NAME,
-                    filename,
-                    ExtraArgs={"ContentType": image_file.content_type}
-                )
-                image_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{filename}"
+                # Convertir imagen a base64 para subirla con función personalizada
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+                base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
+                filename = f"boards/{uuid.uuid4().hex}.png"
+                image_url = upload_image_to_s3(base64_image, filename)
             except Exception as e:
                 return jsonify({"error": "Error uploading image", "details": str(e)}), 500
 
@@ -80,37 +70,62 @@ def create_board():
             is_public=is_public
         )
 
-        # Manejar miembros (opcional, si envías member_ids como form-data, considera recibirlos)
+        # Agregar miembros (si se proporcionan)
         member_ids = request.form.getlist("member_ids")
         for uid in member_ids:
             member = User.query.get(uid)
             if member:
                 new_board.members.append(member)
 
-        # Manejar tags (opcional, igual que member_ids)
+        # Agregar tags (si se proporcionan)
         tag_ids = request.form.getlist("tag_ids")
         for tid in tag_ids:
             tag = Tag.query.get(tid)
             if tag:
                 new_board.tags.append(tag)
 
+        # Guardar en la base de datos
         db.session.add(new_board)
         db.session.commit()
+
+        return jsonify(new_board.serialize()), 201
+
     except Exception as error:
         db.session.rollback()
-        return jsonify({"error": str(error)})
-
-    return jsonify(new_board.serialize()), 201
-
+        return jsonify({"error": str(error)}), 500
 
 @board_bp.route("/getBoards", methods=["GET"])
 @jwt_required()
 def get_boards():
     try:
+        # Obtener el usuario actual
         user_id= get_jwt_identity()
-    
-    # Obtener todos los tableros
+        user = User.query.get(user_id)
+
+        # Validar si el usuario existe
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        # Obtener todos los tableros
         boards=Board.query.all()
         return jsonify([board.serialize() for board in boards]), 200
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
+
+@board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
+@jwt_required()
+def get_board_by_id(board_id):
+    try:
+        user_id=get_jwt_identity()
+        user= User.query.get(user_id)
+        if not user:
+            return jsonify({"Error":"Usuario no encontrado"}),404
+        board=Board.query.get(board_id)
+        if not board:
+            return jsonify({"Error":"Tablero no encontrado"}),404
+        return jsonify(board.serialize()), 200
+    except Exception as error:
+        return jsonify({"Error":str(error)}),500
+    
+# @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
+# @jwt_required()
+# def favorite_board(board_id):
