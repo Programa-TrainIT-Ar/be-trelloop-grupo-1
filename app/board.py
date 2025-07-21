@@ -103,7 +103,7 @@ def create_board():
     return jsonify(new_board.serialize()), 201
 
 
-@auth_bp.route("/getBoards", methods=["GET"])
+@board_bp.route("/getBoards", methods=["GET"])
 @jwt_required()
 def get_boards():
     try:
