@@ -84,6 +84,7 @@ def create_board():
             if tag:
                 new_board.tags.append(tag)
 
+        new_board.members.append(user)  # Agregar el creador del tablero como miembro
         # Guardar en la base de datos
         db.session.add(new_board)
         db.session.commit()
@@ -108,9 +109,60 @@ def get_boards():
         # Obtener todos los tableros
         boards=Board.query.all()
         return jsonify([board.serialize() for board in boards]), 200
+    
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
 
+@board_bp.route("/getMyBoards",methods=["GET"])
+@jwt_required()
+def get_my_boards():
+    try:
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Error":"Usuario no encontrado"}),404
+        boards=user.boards
+        return jsonify([board.serialize() for board in boards]), 200
+    except Exception as error:
+        return jsonify({"Error":str(error)}),500
+    
+@board_bp.route("/addMember/<int:board_id>", methods=["POST"])
+@jwt_required()
+def add_member_to_board(board_id):
+    try:
+        #Obtengo el usuario actual
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Error":"Usuario no encontrado"}),404
+        
+        # Obtengo el tablero al que se le quiere agregar un miembro
+        board=Board.query.get(board_id)
+        if not board:
+            return jsonify({"Error":"Tablero no encontrado"}),404
+        
+        # Obtengo el ID del miembro a agregar desde el cuerpo de la solicitud
+        member_id=request.json.get("member_id")
+        if not member_id:
+            return jsonify({"Error":"ID no encontrado"}),400
+        
+        member=User.query.get(member_id)
+        if not member:
+            return jsonify({"Error":"Miembro no encontrado"}),404
+        
+        if member in board.members:
+            return jsonify({"Error":"El miembro ya está en el tablero"}),400
+    
+        
+        # Agrego el miembro al tablero
+        board.members.append(member)
+        db.session.commit()
+        return jsonify({"message": "Miembro agregado exitosamente"}), 200
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Error":str(error)}),500
+    
+    
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
 @jwt_required()
 def get_board_by_id(board_id):
