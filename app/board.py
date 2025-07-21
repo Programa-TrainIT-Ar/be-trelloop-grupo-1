@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from io import BytesIO
 from .models import db, User, Board, Tag
@@ -17,6 +18,8 @@ from flask_jwt_extended import (
 s3 = boto3.client("s3")
 BUCKET_NAME = "trainit404"
 
+
+# Esta función sube una imagen a S3 y devuelve la URL de la imagen
 def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
     binary_data = base64.b64decode(encoded)
@@ -30,10 +33,10 @@ def upload_image_to_s3(base64_image, filename):
     return f"https://{BUCKET_NAME}.s3.amazonaws.com/{filename}"
 
 
-board_bp = Blueprint('board', __name__)
 
 #CREAR TABLEROS-------------------------------------------------------------------------------------------------------
-@app.route("/createBoard", methods=["POST"])
+@board_bp.route("/createBoard", methods=["POST"])
+@jwt_required()
 def create_board():
     try:
         # Recibes los datos de texto desde request.form

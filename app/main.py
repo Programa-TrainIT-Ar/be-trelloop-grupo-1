@@ -1,11 +1,13 @@
 from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
+from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
-from .models import Message, User
-from flask_migrate import Migrate
+from .models import Message, User, Board, Tag
 from .auth import auth_bp
-from flask_jwt_extended import JWTManager
+from .board import board_bp
+from .tag import tag_bp
 from datetime import timedelta
 import os
 
@@ -41,8 +43,10 @@ def user_lookup_callback(_jwt_header, jwt_data):
     identity = jwt_data["sub"]
     return User.query.filter_by(id=identity).one_or_none()
 
-# Estaba repetido el blueprint, asi que lo eliminamos y dejamos este.
+# Blueprint para relacionar archico principal con el manejo de autenticación y tableros
 app.register_blueprint(auth_bp, url_prefix="/auth")
+app.register_blueprint(board_bp, url_prefix="/board")
+app.register_blueprint(tag_bp, url_prefix="/tag")
 
 
 @app.before_request

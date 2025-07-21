@@ -8,6 +8,8 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity
 )
 
+# Rama grupo 1
+
 auth_bp = Blueprint("auth", __name__)
 CORS(auth_bp)
 
@@ -41,8 +43,8 @@ def login():
 
         if user.verify_password(password):
             # Genera el token de acceso con Flask-JWT-Extended
-            access_token = create_access_token(identity=user.id)
-            refresh_token = create_refresh_token(identity=user.id)
+            access_token = create_access_token(identity=str(user.id))
+            refresh_token = create_refresh_token(identity=str(user.id))
 
             return jsonify({
                 "mensaje": "Login exitoso",
@@ -76,7 +78,7 @@ def refresh_token():
             return jsonify({"error": "Usuario no encontrado"}), 404
 
         # Genera un nuevo token de acceso
-        new_access_token = create_access_token(identity=user_id)
+        new_access_token = create_access_token(identity=str(user_id))
 
         return jsonify({
             "access_token": new_access_token,
@@ -128,8 +130,8 @@ def register_user():
         db.session.commit()
 
         # Genera tokens para el usuario recién registrado con Flask-JWT-Extended
-        access_token = create_access_token(identity=new_user.id)
-        refresh_token = create_refresh_token(identity=new_user.id)
+        access_token = create_access_token(identity=str(new_user.id))
+        refresh_token = create_refresh_token(identity=str(new_user.id))
 
         return jsonify({
             "mensaje": "Usuario registrado exitosamente",
