@@ -83,7 +83,8 @@ def registrar_usuario():
             apellido=apellido,
             correo=correo
         )
-        nuevo_usuario.set_contrasena(contrasena)
+        nuevo_usuario.guarda_contrasena(contrasena)
+
 
         db.session.add(nuevo_usuario)
         db.session.commit()
