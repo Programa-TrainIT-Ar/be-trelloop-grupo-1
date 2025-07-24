@@ -178,6 +178,36 @@ def get_board_by_id(board_id):
     except Exception as error:
         return jsonify({"Error":str(error)}),500
     
+@board_bp.route("/deleteBoard/<int:board_id>", methods=["DELETE"])
+@jwt_required()
+def delete_board(board_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        board = Board.query.get(board_id)
+
+        if not board:
+            return jsonify({"error": "Tablero no encontrado"}), 404
+
+        # Verificamos si el usuario es el creador del tablero
+        if board.user_id != user.id:
+            return jsonify({"error": "No tienes permisos para eliminar este tablero"}), 403
+
+        db.session.delete(board)
+        db.session.commit()
+
+        return jsonify({"message": "Tablero eliminado exitosamente"}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": str(error)}), 500
+
+
+    
 # @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
 # @jwt_required()
 # def favorite_board(board_id):
