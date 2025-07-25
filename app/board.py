@@ -19,7 +19,7 @@ BUCKET_NAME = "trainit404"
 def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
     binary_data = base64.b64decode(encoded)
-    
+
     s3.upload_fileobj(
         BytesIO(binary_data),
         BUCKET_NAME,
@@ -109,7 +109,7 @@ def get_boards():
         # Obtener todos los tableros
         boards=Board.query.all()
         return jsonify([board.serialize() for board in boards]), 200
-    
+
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
 
@@ -125,7 +125,7 @@ def get_my_boards():
         return jsonify([board.serialize() for board in boards]), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
-    
+
 @board_bp.route("/addMember/<int:board_id>", methods=["POST"])
 @jwt_required()
 def add_member_to_board(board_id):
@@ -135,25 +135,25 @@ def add_member_to_board(board_id):
         user=User.query.get(user_id)
         if not user:
             return jsonify({"Error":"Usuario no encontrado"}),404
-        
+
         # Obtengo el tablero al que se le quiere agregar un miembro
         board=Board.query.get(board_id)
         if not board:
             return jsonify({"Error":"Tablero no encontrado"}),404
-        
+
         # Obtengo el ID del miembro a agregar desde el cuerpo de la solicitud
         member_id=request.json.get("member_id")
         if not member_id:
             return jsonify({"Error":"ID no encontrado"}),400
-        
+
         member=User.query.get(member_id)
         if not member:
             return jsonify({"Error":"Miembro no encontrado"}),404
-        
+
         if member in board.members:
             return jsonify({"Error":"El miembro ya está en el tablero"}),400
-    
-        
+
+
         # Agrego el miembro al tablero
         board.members.append(member)
         db.session.commit()
@@ -161,8 +161,8 @@ def add_member_to_board(board_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"Error":str(error)}),500
-    
-    
+
+
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
 @jwt_required()
 def get_board_by_id(board_id):
@@ -177,101 +177,92 @@ def get_board_by_id(board_id):
         return jsonify(board.serialize()), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
-    
+
 # @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
 # @jwt_required()
 # def favorite_board(board_id):
 
 #ACTUALIZAR UN TABLERO EXISTENTE
 
-@board_bp.route("/updateBoard/<int:board_id>", métodos=["PUT"])
+@board_bp.route("/updateBoard/<int:board_id>", methods=["PUT"])
 @jwt_required()
-def update_board(id_tablero):
-intentar:
-id_de_usuario_actual = obtener_identidad_jwt()
-tablero = Tablero.consulta.get(tablero_id)
+def update_board(board_id):
+    try:
+        current_user_id = get_jwt_identity()
+        board = Board.query.get(board_id)
 
-# 1. Verificar si el tablero existe
-Si no tablero:
-return jsonify({"error": "Tablero no encontrado"}), 404
+        # 1. Verificar si el tablero existe
+        if not board:
+            return jsonify({"error": "Tablero no encontrado"}), 404
 
-# 2. Verificar si el usuario actual es el propietario del tablero
-# verificar porque quizas si deban editar un tablero que no
-le pertenece
-si board.user_id != id_usuario_actual:
-return jsonify({"error": "No tienes permiso para editar
-este tablero"}), 403
+        # 2. Verificar si el usuario actual es el propietario del tablero
+        # verificar porque quizas si deban editar un tablero que no le pertenece
+        if board.user_id != current_user_id:
+            return jsonify({"error": "No tienes permiso para editar este tablero"}), 403
 
-# 3. Actualizar los campos proporcionados en la solicitud
-# Se usa request.form.get() para evitar errores si un campo no se envía
-Si "nombre" está en request.form:
-board.name = solicitud.formulario.obtener("nombre")
-Si hay "descripción" en el formulario de solicitud:
-tablero.descripción = solicitud.formulario.get("descripción")
-Si "isPublic" está en request.form:
-tablero.es_público = solicitud.formulario.obtener("esPúblico").inferior() == "verdadero"
+        # 3. Actualizar los campos proporcionados en la solicitud
+        # Se usa request.form.get() para evitar errores si un campo no se envía
+        if "name" in request.form:
+            board.name = request.form.get("name")
+        if "description" in request.form:
+            board.description = request.form.get("description")
+        if "isPublic" in request.form:
+            board.is_public = request.form.get("isPublic").lower() == "true"
 
-# 4. Actualizar la imagen si se proporciona una nueva
-Si hay "imagen" en request.files:
-archivo_de_imagen = solicitud.archivos.obtener("imagen")
-si archivo_de_imagen:
-intentar:
-# Nota: Sería ideal eliminar la imagen antigua de S3 aquí
-imagen codificada =
-base64.b64encode(archivo_de_imagen.read()).decode('utf-8')
-imagen base64 =
-f"datos:{archivo_de_imagen.tipo_de_contenido};base64,{imagen_codificada}"
-nombre de archivo = f"tableros/{uuid.uuid4().hex}.png"
-tablero.imagen = subir_imagen_a_s3(imagen_base64, nombre_archivo)
-excepto Excepción como e:
-return jsonify({"error": "Error al subir la nueva
-imagen", "detalles": str(e)}), 500
+        # 4. Actualizar la imagen si se proporciona una nueva
+        if "image" in request.files:
+            image_file = request.files.get("image")
+            if image_file:
+                try:
+                    # Nota: Sería ideal eliminar la imagen antigua de S3 aquí
+                    encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+                    base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
+                    filename = f"boards/{uuid.uuid4().hex}.png"
+                    board.image = upload_image_to_s3(base64_image, filename)
+                except Exception as e:
+                    return jsonify({"error": "Error al subir la nueva imagen", "details": str(e)}), 500
 
-# 5. Guardar los cambios en la base de datos
-db.session.commit()
+        # 5. Guardar los cambios en la base de datos
+        db.session.commit()
 
-devolver jsonify({
-"message": "Tablero actualizado exitosamente 👍",
-"tablero": tablero.serialize()
-}), 200
+        return jsonify({
+            "message": "Tablero actualizado exitosamente",
+            "board": board.serialize()
+        }), 200
 
-excepto Excepción como error:
-db.session.rollback()
-return jsonify({"error": "Ocurrió un error al actualizar el
-tablero", "detalles": str(error)}), 500
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": "Ocurrió un error al actualizar el tablero", "details": str(error)}), 500
 
 
 # ELIMINAR UN TABLERO
-----------------------------------------------------------------------------------------------
-@board_bp.route("/deleteBoard/<int:board_id>", métodos=["BORRAR"])
+#----------------------------------------------------------------------------------------------
+@board_bp.route("/deleteBoard/<int:board_id>", methods=["DELETE"])
 @jwt_required()
-def eliminar_tablero(id_tablero):
-"""
-Elimina un tablero. Solo el creador del tablero puede eliminarlo.
-"""
-intentar:
-id_de_usuario_actual = obtener_identidad_jwt()
-tablero = Tablero.consulta.get(tablero_id)
+def delete_board(board_id):
+    """
+    Elimina un tablero. Solo el creador del tablero puede eliminarlo.
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        board = Board.query.get(board_id)
 
-# 1. Verificar si el tablero existe
-Si no tablero:
-return jsonify({"error": "Tablero no encontrado"}), 404
+        # 1. Verificar si el tablero existe
+        if not board:
+            return jsonify({"error": "Tablero no encontrado"}), 404
 
-# 2. Verificar si el usuario actual es el propietario del tablero
-si board.user_id != id_usuario_actual:
-return jsonify({"error": "No tienes permiso para eliminar
-este tablero"}), 403
+        # 2. Verificar si el usuario actual es el propietario del tablero
+        if board.user_id != current_user_id:
+            return jsonify({"error": "No tienes permiso para eliminar este tablero"}), 403
 
-# Nota: Sería ideal eliminar la imagen asociada de S3 aquí
-para no dejar archivos huérfanos.
+        # Nota: Sería ideal eliminar la imagen asociada de S3 aquí para no dejar archivos huérfanos.
 
-# 3. Eliminar el tablero de la base de datos
-db.session.delete(tablero)
-db.session.commit()
+        # 3. Eliminar el tablero de la base de datos
+        db.session.delete(board)
+        db.session.commit()
 
-return jsonify({"message": "Tablero eliminado exitosamente 🗑️"}), 200
+        return jsonify({"message": "Tablero eliminado exitosamente"}), 200
 
-excepto Excepción como error:
-db.session.rollback()
-return jsonify({"error": "Ocurrió un error al eliminar el
-tablero", "detalles": str(error)}), 500
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": "Ocurrió un error al eliminar el tablero", "details": str(error)}), 500
