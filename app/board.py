@@ -19,7 +19,7 @@ BUCKET_NAME = "trainit404"
 def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
     binary_data = base64.b64decode(encoded)
-    
+
     s3.upload_fileobj(
         BytesIO(binary_data),
         BUCKET_NAME,
@@ -109,7 +109,7 @@ def get_boards():
         # Obtener todos los tableros
         boards=Board.query.all()
         return jsonify([board.serialize() for board in boards]), 200
-    
+
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
 
@@ -125,7 +125,7 @@ def get_my_boards():
         return jsonify([board.serialize() for board in boards]), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
-    
+
 @board_bp.route("/addMember/<int:board_id>", methods=["POST"])
 @jwt_required()
 def add_member_to_board(board_id):
@@ -135,25 +135,25 @@ def add_member_to_board(board_id):
         user=User.query.get(user_id)
         if not user:
             return jsonify({"Error":"Usuario no encontrado"}),404
-        
+
         # Obtengo el tablero al que se le quiere agregar un miembro
         board=Board.query.get(board_id)
         if not board:
             return jsonify({"Error":"Tablero no encontrado"}),404
-        
+
         # Obtengo el ID del miembro a agregar desde el cuerpo de la solicitud
         member_id=request.json.get("member_id")
         if not member_id:
             return jsonify({"Error":"ID no encontrado"}),400
-        
+
         member=User.query.get(member_id)
         if not member:
             return jsonify({"Error":"Miembro no encontrado"}),404
-        
+
         if member in board.members:
             return jsonify({"Error":"El miembro ya está en el tablero"}),400
-    
-        
+
+
         # Agrego el miembro al tablero
         board.members.append(member)
         db.session.commit()
@@ -161,8 +161,8 @@ def add_member_to_board(board_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"Error":str(error)}),500
-    
-    
+
+
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
 @jwt_required()
 def get_board_by_id(board_id):
@@ -177,7 +177,7 @@ def get_board_by_id(board_id):
         return jsonify(board.serialize()), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
-    
+
 # @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
 # @jwt_required()
 # def favorite_board(board_id):
