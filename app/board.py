@@ -193,6 +193,7 @@ def update_board(board_id):
 
         # 1. Verificar si el tablero existe
         if not board:
+
             return jsonify({"error": "Tablero no encontrado"}), 404
 
         # 2. Verificar si el usuario actual es el propietario del tablero
