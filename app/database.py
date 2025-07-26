@@ -3,9 +3,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 # Instancia global del ORM de SQLAlchemy para usar con Flask
-db = SQLAlchemy()  # Antes: db
+db = SQLAlchemy()  # Previamente: bd
 
-def obtener_motor():
+def get_engine():
     """
     Crea y retorna un motor de SQLAlchemy utilizando la URL de conexión a la base de datos.
     Ideal para tareas fuera del contexto de Flask (scripts, mantenimiento, etc).
@@ -23,16 +23,16 @@ def obtener_motor():
         }
     )
 
-def obtener_sesion():
+def get_session():
     """
     Crea y retorna una sesión de SQLAlchemy (Scoped Session).
     Se usa para scripts y tareas que requieren acceso directo a la BD.
     """
-    motor = obtener_motor()
-    fabrica_sesion = sessionmaker(bind=motor)
-    return scoped_session(fabrica_sesion)
+    engine = get_engine()
+    session_factory = sessionmaker(bind=engine)
+    return scoped_session(session_factory)
 
-def inicializar_base_de_datos(app):
+def initialize_database(app):
     """
     Configura e inicializa SQLAlchemy con la aplicación Flask.
     Debe llamarse al iniciar la app.
@@ -51,15 +51,15 @@ def inicializar_base_de_datos(app):
     db.init_app(app)
     return db
 
-def verificar_conexion():
+def verify_connection():
     """
     Verifica si se puede establecer una conexión con la base de datos.
     Devuelve True si la conexión fue exitosa, False si hubo error.
     """
     try:
-        motor = obtener_motor()
-        with motor.connect() as conexion:
-            conexion.execute(text("SELECT 1"))
+        engine = get_engine()
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
         return True
     except Exception as error:
         print(f"❌ Error de conexión a PostgreSQL: {str(error)}")
