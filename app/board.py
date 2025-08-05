@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS, cross_origin
 from datetime import datetime
 from io import BytesIO
 from .models import db, User, Board, Tag
@@ -8,13 +9,15 @@ import boto3
 import base64
 
 board_bp = Blueprint("board", __name__)
-
+CORS(board_bp)
 # Para utilizar S3 de AWS instalar Boto3 con el siguiente comando: pipenv install boto3
 # Configuración de S3
 s3 = boto3.client("s3")
 BUCKET_NAME = "trainit404"
 
 
+#Tambien se puede instalar con
+#pip install python-dotenv
 # Esta función sube una imagen a S3 y devuelve la URL de la imagen
 def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
@@ -29,6 +32,11 @@ def upload_image_to_s3(base64_image, filename):
     return f"https://{BUCKET_NAME}.s3.amazonaws.com/{filename}"
 
 
+
+@board_bp.before_request
+def handle_options_request():
+    if request.method == 'OPTIONS':
+        return '', 204
 
 #CREAR TABLEROS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/createBoard", methods=["POST"])
@@ -85,6 +93,14 @@ def create_board():
                 new_board.tags.append(tag)
 
         new_board.members.append(user)  # Agregar el creador del tablero como miembro
+
+        general_tag=Tag.query.filter_by(name="General").first()
+        if not general_tag:
+            general_tag = Tag(name="General")
+            db.session.add(general_tag)
+            db.session.flush()
+            
+        new_board.tags.append(general_tag)  # Agregar tag general por defecto
         # Guardar en la base de datos
         db.session.add(new_board)
         db.session.commit()
