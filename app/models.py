@@ -31,9 +31,10 @@ class User(db.Model):
     last_name = db.Column(db.String(70), unique=False, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
+    profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
 
     boards = db.relationship('Board', secondary='board_user_association', back_populates='members')
-    
+
     def set_password(self, password):
         # Guarda la contraseña encriptada
         password_bytes = password.encode("utf-8")
@@ -53,7 +54,8 @@ class User(db.Model):
             "id": self.id,
             "firstName": self.first_name,
             "lastName": self.last_name,
-            "email": self.email
+            "email": self.email,
+            "profileImage": self.profile_image  # Incluir la URL de la imagen en la serialización
             # No incluir la contraseña - brecha de seguridad
         }
 
@@ -80,7 +82,7 @@ class Board(db.Model):
             "image": self.image,
             "creationDate": self.creation_date.isoformat(),
             "userId": self.user_id,
-            "members": [member.serialize() for member in self.members], 
+            "members": [member.serialize() for member in self.members],
             "tags": [tag.serialize() for tag in self.tags],
             "isPublic": self.is_public
         }

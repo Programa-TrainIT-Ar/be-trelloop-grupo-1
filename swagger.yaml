@@ -1,0 +1,629 @@
+# ==================== COMIENZO ====================
+openapi: 3.0.3
+info:
+  title: Trelloop API - Backend Grupo 1
+  description: |
+    API REST para el sistema de gestión de tareas colaborativo Trelloop.
+
+    ## Autenticación
+    Esta API utiliza tokens JWT (JSON Web Tokens) para la autenticación.
+
+    ### Proceso de autenticación:
+    1. Registrarse o iniciar sesión para obtener tokens
+    2. Incluir el access_token en el header Authorization: `Bearer {token}`
+    3. Usar el refresh_token para renovar tokens expirados
+
+    ## Características principales
+    - Gestión de usuarios con autenticación JWT
+    - Tableros colaborativos estilo Trello
+    - Soporte para imágenes de perfil (Amazon S3)
+    - Sistema de etiquetas para organización
+    - Mensajería básica
+  version: 1.0.0
+  contact:
+    name: Grupo 1 - Trelloop
+    email: diegofigueroanl@gmail.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Servidor de desarrollo local
+  - url: ""
+    description: Servidor de producción
+
+paths:
+  # ==================== AUTENTICACIÓN ====================
+  /auth/login:
+    post:
+      tags:
+        - Autenticación
+      summary: Iniciar sesión
+      description: |
+        Autentica a un usuario con email y contraseña, devolviendo tokens JWT para acceso y renovación.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "usuario@ejemplo.com"
+                  description: Correo electrónico del usuario
+                password:
+                  type: string
+                  format: password
+                  example: "miPassword123"
+                  description: Contraseña del usuario
+            examples:
+              ejemplo_login:
+                summary: Login de ejemplo
+                value:
+                  email: "juan.perez@ejemplo.com"
+                  password: "Password123!"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Login exitoso"
+                  usuario:
+                    $ref: "#/components/schemas/User"
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    description: Token JWT para autorizaciones
+                  refresh_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    description: Token para renovar el access_token
+                  token_type:
+                    type: string
+                    example: "Bearer"
+                    description: Tipo de token
+        "400":
+          description: Datos inválidos o faltantes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                datos_faltantes:
+                  summary: Campos requeridos faltantes
+                  value:
+                    error: "Correo y contraseña son requeridos"
+        "401":
+          description: Credenciales incorrectas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Credenciales incorrectas"
+        "404":
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "El usuario no existe"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      tags:
+        - Autenticación
+      summary: Registrar nuevo usuario
+      description: |
+        Crea una nueva cuenta de usuario. Opcionalmente puede incluir una URL de imagen de perfil.
+        La imagen debe estar previamente subida a Amazon S3.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - firstName
+                - lastName
+                - email
+                - password
+              properties:
+                firstName:
+                  type: string
+                  minLength: 2
+                  maxLength: 70
+                  example: "Juan"
+                  description: Nombre del usuario
+                lastName:
+                  type: string
+                  minLength: 2
+                  maxLength: 70
+                  example: "Pérez"
+                  description: Apellido del usuario
+                email:
+                  type: string
+                  format: email
+                  example: "juan.perez@ejemplo.com"
+                  description: Correo electrónico único del usuario
+                password:
+                  type: string
+                  minLength: 8
+                  example: "Password123!"
+                  description: Contraseña del usuario (mínimo 8 caracteres)
+                profileImage:
+                  type: string
+                  format: uri
+                  nullable: true
+                  example: "https://mi-bucket.s3.amazonaws.com/profile-images/usuario123.jpg"
+                  description: URL de la imagen de perfil almacenada en Amazon S3
+            examples:
+              registro_completo:
+                summary: Registro con imagen
+                value:
+                  firstName: "María"
+                  lastName: "González"
+                  email: "maria.gonzalez@ejemplo.com"
+                  password: "MiPassword123!"
+                  profileImage: "https://bucket.s3.amazonaws.com/profiles/maria.jpg"
+              registro_basico:
+                summary: Registro sin imagen
+                value:
+                  firstName: "Carlos"
+                  lastName: "Rodríguez"
+                  email: "carlos.rodriguez@ejemplo.com"
+                  password: "Password123!"
+      responses:
+        "201":
+          description: Usuario registrado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Usuario registrado exitosamente"
+                  usuario:
+                    $ref: "#/components/schemas/User"
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refresh_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  token_type:
+                    type: string
+                    example: "Bearer"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                campos_requeridos:
+                  summary: Campos faltantes
+                  value:
+                    error: "Todos los campos son requeridos"
+                correo_invalido:
+                  summary: Formato de correo inválido
+                  value:
+                    error: "Correo inválido"
+        "409":
+          description: Conflicto - Email ya registrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "El correo ya está registrado"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      tags:
+        - Autenticación
+      summary: Renovar token de acceso
+      description: |
+        Genera un nuevo access_token usando un refresh_token válido.
+        Útil cuando el access_token ha expirado.
+      operationId: refreshToken
+      security:
+        - BearerAuthRefresh: []
+      responses:
+        "200":
+          description: Token renovado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    description: Nuevo token de acceso
+                  token_type:
+                    type: string
+                    example: "Bearer"
+        "401":
+          description: Refresh token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      tags:
+        - Autenticación
+      summary: Obtener perfil del usuario autenticado
+      description: |
+        Devuelve la información del perfil del usuario actualmente autenticado.
+        Requiere un access_token válido.
+      operationId: getUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Perfil obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario:
+                    $ref: "#/components/schemas/User"
+        "401":
+          description: Token inválido o faltante
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ==================== MENSAJES ====================
+  /message:
+    get:
+      tags:
+        - Mensajes
+      summary: Obtener todos los mensajes
+      description: |
+        Devuelve una lista de todos los mensajes en el sistema.
+        **Nota**: Este es un endpoint de ejemplo/prueba.
+      operationId: getAllMessages
+      responses:
+        "200":
+          description: Lista de mensajes obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+              example:
+                - id: 1
+                  content: "Este es mi primer mensaje"
+                - id: 2
+                  content: "Segundo mensaje de prueba"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Mensajes
+      summary: Crear nuevo mensaje
+      description: |
+        Crea un nuevo mensaje en el sistema.
+        **Nota**: Este es un endpoint de ejemplo/prueba.
+      operationId: createMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  maxLength: 255
+                  example: "Este es mi nuevo mensaje"
+                  description: Contenido del mensaje
+            example:
+              content: "¡Hola! Este es un mensaje de prueba"
+      responses:
+        "201":
+          description: Mensaje creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+              example:
+                id: 3
+                content: "¡Hola! Este es un mensaje de prueba"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# ==================== COMPONENTES ====================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT de acceso.
+        Incluir en el header como: `Authorization: Bearer {token}`
+    BearerAuthRefresh:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT de renovación.
+        Incluir en el header como: `Authorization: Bearer {refresh_token}`
+
+  schemas:
+    # ==================== MODELOS PRINCIPALES ====================
+    User:
+      type: object
+      description: Modelo de usuario del sistema
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único del usuario
+        firstName:
+          type: string
+          example: "Juan"
+          description: Nombre del usuario
+        lastName:
+          type: string
+          example: "Pérez"
+          description: Apellido del usuario
+        email:
+          type: string
+          format: email
+          example: "juan.perez@ejemplo.com"
+          description: Correo electrónico único del usuario
+        profileImage:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://bucket.s3.amazonaws.com/profiles/juan.jpg"
+          description: URL de la imagen de perfil almacenada en Amazon S3
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+
+    Board:
+      type: object
+      description: Modelo de tablero colaborativo
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único del tablero
+        name:
+          type: string
+          example: "Proyecto Web"
+          description: Nombre del tablero
+        description:
+          type: string
+          nullable: true
+          example: "Tablero para gestionar el desarrollo del sitio web"
+          description: Descripción del tablero
+        image:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://bucket.s3.amazonaws.com/boards/proyecto-web.jpg"
+          description: URL de la imagen del tablero
+        creationDate:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+          description: Fecha de creación del tablero
+        userId:
+          type: integer
+          example: 1
+          description: ID del usuario propietario del tablero
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+          description: Lista de miembros del tablero
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+          description: Lista de etiquetas asociadas al tablero
+        isPublic:
+          type: boolean
+          example: false
+          description: Indica si el tablero es público (true) o privado (false)
+      required:
+        - id
+        - name
+        - creationDate
+        - userId
+        - isPublic
+
+    Tag:
+      type: object
+      description: Modelo de etiqueta para categorización
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único de la etiqueta
+        name:
+          type: string
+          example: "Urgente"
+          description: Nombre de la etiqueta
+      required:
+        - id
+        - name
+
+    Message:
+      type: object
+      description: Modelo de mensaje (ejemplo/prueba)
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único del mensaje
+        content:
+          type: string
+          example: "Este es un mensaje de prueba"
+          description: Contenido del mensaje
+      required:
+        - id
+        - content
+
+    # ==================== MODELOS DE RESPUESTA ====================
+    ErrorResponse:
+      type: object
+      description: Formato estándar para respuestas de error
+      properties:
+        error:
+          type: string
+          example: "Descripción del error"
+          description: Mensaje descriptivo del error
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      description: Formato estándar para respuestas exitosas simples
+      properties:
+        mensaje:
+          type: string
+          example: "Operación realizada exitosamente"
+          description: Mensaje de confirmación
+      required:
+        - mensaje
+
+    AuthResponse:
+      type: object
+      description: Formato de respuesta para autenticación exitosa
+      properties:
+        mensaje:
+          type: string
+          example: "Login exitoso"
+          description: Mensaje de confirmación
+        usuario:
+          $ref: "#/components/schemas/User"
+        access_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: Token JWT para autorización
+        refresh_token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: Token para renovar el access_token
+        token_type:
+          type: string
+          example: "Bearer"
+          description: Tipo de token
+      required:
+        - mensaje
+        - usuario
+        - access_token
+        - refresh_token
+        - token_type
+
+# ==================== TAGS ====================
+tags:
+  - name: Autenticación
+    description: |
+      Endpoints para registro, login y gestión de tokens JWT.
+
+      ### Flujo de autenticación:
+      1. **Registro**: POST /auth/register - Crear nueva cuenta
+      2. **Login**: POST /auth/login - Obtener tokens JWT
+      3. **Perfil**: GET /auth/me - Obtener información del usuario autenticado
+      4. **Renovación**: POST /auth/refresh - Renovar token expirado
+
+      ### Uso de tokens:
+      - **Access Token**: Incluir en header `Authorization: Bearer {token}` para endpoints protegidos
+      - **Refresh Token**: Usar en endpoint /auth/refresh para obtener nuevo access token
+
+  - name: Mensajes
+    description: |
+      Endpoints para gestión de mensajes básicos.
+      **Nota**: Estos son endpoints de ejemplo/prueba para validar la funcionalidad básica de la API.
+
+# ==================== INFORMACIÓN ADICIONAL ====================
+externalDocs:
+  description: Repositorio del proyecto en GitHub
+  url: https://github.com/Programa-TrainIT-Ar/be-trelloop-grupo-1
+
+x-logo:
+  url: "https://via.placeholder.com/150x50/007acc/ffffff?text=Trelloop"
+  altText: "Trelloop API Logo"
