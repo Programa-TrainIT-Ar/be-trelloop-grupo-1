@@ -190,6 +190,9 @@ def get_board_by_id(board_id):
         board=Board.query.get(board_id)
         if not board:
             return jsonify({"Error":"Tablero no encontrado"}),404
+        if user not in board.members and not board.is_public:
+            return jsonify({"Error": "No tienes acceso a este tablero"}), 403
+        
         return jsonify(board.serialize()), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
