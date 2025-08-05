@@ -104,7 +104,7 @@ def register_user():
         # Campo opcional para la URL de la imagen de perfil del usuario
         # Este campo debe contener una URL válida a una imagen ya subida a Amazon S3
         # Ejemplo: "https://bucket-name.s3.region.amazonaws.com/path/to/image.jpg"
-        profile_image = body.get("profileImage")
+        # profile_image = body.get("profileImage")
 
         # Validaciones básicas
         if not first_name or not last_name or not email or not password:
@@ -125,7 +125,7 @@ def register_user():
             first_name=first_name,
             last_name=last_name,
             email=email,
-            profile_image=profile_image  # URL de la imagen de perfil (puede ser None)
+            # profile_image=profile_image  # URL de la imagen de perfil (puede ser None)
         )
         new_user.set_password(password)
 

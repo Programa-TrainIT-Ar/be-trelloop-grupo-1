@@ -31,7 +31,7 @@ class User(db.Model):
     last_name = db.Column(db.String(70), unique=False, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
-    profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
+    # profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
 
     boards = db.relationship('Board', secondary='board_user_association', back_populates='members')
 
@@ -55,7 +55,7 @@ class User(db.Model):
             "firstName": self.first_name,
             "lastName": self.last_name,
             "email": self.email,
-            "profileImage": self.profile_image  # Incluir la URL de la imagen en la serialización
+            # "profileImage": self.profile_image  # Incluir la URL de la imagen en la serialización
             # No incluir la contraseña - brecha de seguridad
         }
 
