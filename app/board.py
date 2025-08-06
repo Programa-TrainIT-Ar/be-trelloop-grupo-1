@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS, cross_origin
 from datetime import datetime
 from io import BytesIO
 from .models import db, User, Board, Tag
@@ -8,19 +9,21 @@ import boto3
 import base64
 
 board_bp = Blueprint("board", __name__)
-
+CORS(board_bp)
 # Para utilizar S3 de AWS instalar Boto3 con el siguiente comando: pipenv install boto3
 # Configuración de S3
 s3 = boto3.client("s3")
 BUCKET_NAME = "trainit404"
 
 
+#Tambien se puede instalar con
+#pip install python-dotenv
 # Esta función sube una imagen a S3 y devuelve la URL de la imagen
 def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
     binary_data = base64.b64decode(encoded)
 
-    s3.upload_fileobj(
+    s3.upload_fileobj( 
         BytesIO(binary_data),
         BUCKET_NAME,
         filename,
@@ -29,6 +32,11 @@ def upload_image_to_s3(base64_image, filename):
     return f"https://{BUCKET_NAME}.s3.amazonaws.com/{filename}"
 
 
+
+@board_bp.before_request
+def handle_options_request():
+    if request.method == 'OPTIONS':
+        return '', 204
 
 #CREAR TABLEROS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/createBoard", methods=["POST"])
@@ -85,6 +93,14 @@ def create_board():
                 new_board.tags.append(tag)
 
         new_board.members.append(user)  # Agregar el creador del tablero como miembro
+
+        general_tag=Tag.query.filter_by(name="General").first()
+        if not general_tag:
+            general_tag = Tag(name="General")
+            db.session.add(general_tag)
+            db.session.flush()
+            
+        new_board.tags.append(general_tag)  # Agregar tag general por defecto
         # Guardar en la base de datos
         db.session.add(new_board)
         db.session.commit()
@@ -95,6 +111,7 @@ def create_board():
         db.session.rollback()
         return jsonify({"error": str(error)}), 500
 
+#OBTENER TABLEROS (TODOS)-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getBoards", methods=["GET"])
 @jwt_required()
 def get_boards():
@@ -113,6 +130,8 @@ def get_boards():
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
 
+
+#OBTENER MIS TABLEROS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getMyBoards",methods=["GET"])
 @jwt_required()
 def get_my_boards():
@@ -162,7 +181,7 @@ def add_member_to_board(board_id):
         db.session.rollback()
         return jsonify({"Error":str(error)}),500
 
-
+#OBTENER UN TABLERO POR ID-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
 @jwt_required()
 def get_board_by_id(board_id):
@@ -174,67 +193,111 @@ def get_board_by_id(board_id):
         board=Board.query.get(board_id)
         if not board:
             return jsonify({"Error":"Tablero no encontrado"}),404
+        if user not in board.members and not board.is_public:
+            return jsonify({"Error": "No tienes acceso a este tablero"}), 403
+        
         return jsonify(board.serialize()), 200
     except Exception as error:
         return jsonify({"Error":str(error)}),500
 
-# @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
-# @jwt_required()
-# def favorite_board(board_id):
+@board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
+@jwt_required()
+def favorite_board(board_id):
+   try:
+       user_id=get_jwt_identity()
+       user=User.query.get(user_id)
+       if not user:
+           return jsonify({"Warning":"Usuario no encontrado"}),404
+       board=Board.query.get(board_id)
+       if not board:
+           return jsonify({"Warning":"Tablero no encontrado"}),404
+       if board in user.favorites:
+           return jsonify({"Warning":"El tablero ya está en favoritos"}),400
+       user.favorites.append(board)
+       db.session.commit()
+       
+       return jsonify({"message":"Tablero agregado a favoritos"}),200
+   except Exception as error:
+       db.session.rollback()
+       return jsonify({"Warning":str(error)}),500
+   
+@board_bp.route("/getFavoriteBoards",methods=["GET"])
+@jwt_required()
+def get_favorite_boards():
+    try:
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        favorite_boards=user.favorites
+        return jsonify([board.serialize() for board in favorite_boards]),200
+    except Exception as error:
+           return jsonify({"Warning":str(error)}),500
 
+@board_bp.route("/removeFavoriteBoard/<int:board_id>",methods=["DELETE"])
+@jwt_required() 
+def remove_favorite_board(board_id):
+    try:
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        board=Board.query.get(board_id)
+        if not board:
+            return jsonify({"Warning":"Tablero no encontrado"}),404
+        if board not in user.favorites:
+            return jsonify({"Warning":"El tablero no está en favoritos"}),400
+        user.favorites.remove(board)
+        db.session.commit()
+        return jsonify({"message":"Tablero eliminado de favoritos"}),200
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Warning":str(error)}),500
+    
 #ACTUALIZAR UN TABLERO EXISTENTE
 
 @board_bp.route("/updateBoard/<int:board_id>", methods=["PUT"])
 @jwt_required()
 def update_board(board_id):
     try:
-        current_user_id = get_jwt_identity()
-        board = Board.query.get(board_id)
-
-        # 1. Verificar si el tablero existe
+        current_user_id=get_jwt_identity()
+        user=User.query.get(current_user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        board=Board.query.get(board_id)
         if not board:
+            return jsonify({"Warning":"Tablero no encontrado"}),404
+        if board.user_id != user.id:
+            return jsonify({"Warning":"No tienes permiso para actualizar este tablero"}),403
+          # Recibir datos del formulario
+        name = request.form.get("name")
+        description = request.form.get("description", "")
+        is_public = request.form.get("isPublic", "false").lower() == "true"
 
-            return jsonify({"error": "Tablero no encontrado"}), 404
+        # Recibir archivo de imagen
+        image_file = request.files.get("image")
+        image_url = None
 
-        # 2. Verificar si el usuario actual es el propietario del tablero
-        # verificar porque quizas si deban editar un tablero que no le pertenece
-        if board.user_id != current_user_id:
-            return jsonify({"error": "No tienes permiso para editar este tablero"}), 403
+        if image_file:
+            try:
+                # Convertir imagen a base64 para subirla con función personalizada
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+                base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
+                filename = f"boards/{uuid.uuid4().hex}.png"
+                image_url = upload_image_to_s3(base64_image, filename)
+            except Exception as e:
+                return jsonify({"error": "Error uploading image", "details": str(e)}), 500
+        
+        board.name = name
+        board.description = description
+        board.is_public = is_public
 
-        # 3. Actualizar los campos proporcionados en la solicitud
-        # Se usa request.form.get() para evitar errores si un campo no se envía
-        if "name" in request.form:
-            board.name = request.form.get("name")
-        if "description" in request.form:
-            board.description = request.form.get("description")
-        if "isPublic" in request.form:
-            board.is_public = request.form.get("isPublic").lower() == "true"
-
-        # 4. Actualizar la imagen si se proporciona una nueva
-        if "image" in request.files:
-            image_file = request.files.get("image")
-            if image_file:
-                try:
-                    # Nota: Sería ideal eliminar la imagen antigua de S3 aquí
-                    encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-                    base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
-                    filename = f"boards/{uuid.uuid4().hex}.png"
-                    board.image = upload_image_to_s3(base64_image, filename)
-                except Exception as e:
-                    return jsonify({"error": "Error al subir la nueva imagen", "details": str(e)}), 500
-
-        # 5. Guardar los cambios en la base de datos
         db.session.commit()
-
-        return jsonify({
-            "message": "Tablero actualizado exitosamente",
-            "board": board.serialize()
-        }), 200
-
+        db.session.commit()
+        return jsonify({"message": "Tablero actualizado exitosamente"}), 200
     except Exception as error:
         db.session.rollback()
-        return jsonify({"error": "Ocurrió un error al actualizar el tablero", "details": str(error)}), 500
-
+        return jsonify({"error":str(error)}),500
 
 # ELIMINAR UN TABLERO
 #----------------------------------------------------------------------------------------------
@@ -267,3 +330,48 @@ def delete_board(board_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": "Ocurrió un error al eliminar el tablero", "details": str(error)}), 500
+
+# BÚSQUEDA DE USUARIOS PARA AGREGAR COMO MIEMBROS -----------------------------------
+@board_bp.route("/users/search", methods=["GET"])
+@jwt_required()
+def search_users():
+    try:
+        # Obtener parámetro de búsqueda
+        query = request.args.get("q", "").strip()
+
+        if not query or len(query) < 2:
+            return jsonify({
+                "success": True,
+                "users": [],
+                "message": "Ingrese al menos 2 caracteres para buscar"
+            }), 200
+
+        # Buscar por nombre, apellido o email
+        users = User.query.filter(
+            db.or_(
+                User.first_name.ilike(f"%{query}%"),
+                User.last_name.ilike(f"%{query}%"),
+                User.email.ilike(f"%{query}%")
+            )
+        ).limit(10).all()
+
+        # Serializar resultados
+        users_serialized = [{
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email
+        } for user in users]
+
+        return jsonify({
+            "success": True,
+            "users": users_serialized,
+            "count": len(users_serialized)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": "Error al buscar usuarios",
+            "details": str(e)
+        }), 500

@@ -1,10 +1,11 @@
 from .database import db
 import bcrypt
+import enum
 
 #Tabla pivote para declarar relación muchos a muchos entre usuarios y tableros
 board_user_association = db.Table('board_user_association',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
-    db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True)
+    db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True), 
 )
 
 #Tabla piovte para declarar relación muchos a muchos entre tableros y etiquetas
@@ -13,6 +14,17 @@ board_tag_association = db.Table('board_tag_association',
     db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
 )
 
+#Tabla pivote para declarar relación muchos a muchos entre tarjetas y usuarios'
+card_user_association = db.Table('card_user_association',
+    db.Column('card_id', db.Integer, db.ForeignKey('cards.id'), primary_key=True),
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True)
+)
+
+#Tabla pivote para declaracion de muchos a muchos entre favoritos y usuarios
+favorite_boards = db.Table('favorite_boards',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True)
+)
 
 class Message(db.Model):
      id = db.Column(db.Integer, primary_key=True)
@@ -25,9 +37,10 @@ class User(db.Model):
     last_name = db.Column(db.String(70), unique=False, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))
-    profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
+    # profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
 
     boards = db.relationship('Board', secondary='board_user_association', back_populates='members')
+    favorites = db.relationship('Board', secondary='favorite_boards', backref='favorited_by')
 
     def set_password(self, password):
         # Guarda la contraseña encriptada
@@ -49,7 +62,7 @@ class User(db.Model):
             "firstName": self.first_name,
             "lastName": self.last_name,
             "email": self.email,
-            "profileImage": self.profile_image  # Incluir la URL de la imagen en la serialización
+            # "profileImage": self.profile_image  # Incluir la URL de la imagen en la serialización
             # No incluir la contraseña - brecha de seguridad
         }
 
@@ -65,6 +78,9 @@ class Board(db.Model):
     members = db.relationship('User', secondary='board_user_association', back_populates='boards')
     tags = db.relationship('Tag', secondary='board_tag_association', back_populates='boards')
     is_public = db.Column(db.Boolean, default=False) # Indica si el tablero es público o privado, por defecto será privado.
+
+    cards = db.relationship('Card', back_populates='board')
+   
 
 
     def serialize(self):
@@ -91,4 +107,38 @@ class Tag(db.Model):
         return {
             "id": self.id,
             "name": self.name
+        }
+
+class State(enum.Enum):
+    TODO = "To Do"
+    IN_PROGRESS = "In Progress"
+    DONE = "Done"
+
+class Card(db.Model):
+    __tablename__="cards"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    responsable_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    creation_date = db.Column(db.DateTime, nullable=False)
+    begin_date = db.Column(db.DateTime, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=True)
+    state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
+    board_id = db.Column(db.Integer, db.ForeignKey('boards.id'), nullable=False)
+
+    board = db.relationship('Board', back_populates='cards')
+    members = db.relationship('User', secondary='card_user_association', backref='cards')
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "responsableId": self.responsable_id,
+            "creationDate": self.creation_date.isoformat(),
+            "beginDate": self.begin_date.isoformat() if self.begin_date else None,
+            "dueDate": self.due_date.isoformat() if self.due_date else None,
+            "state": self.state.value,
+            "boardId": self.board_id,
+            "members": [member.serialize() for member in self.members]
         }
