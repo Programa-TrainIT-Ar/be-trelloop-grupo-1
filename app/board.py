@@ -111,6 +111,7 @@ def create_board():
         db.session.rollback()
         return jsonify({"error": str(error)}), 500
 
+#OBTENER TABLEROS (TODOS)-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getBoards", methods=["GET"])
 @jwt_required()
 def get_boards():
@@ -129,6 +130,8 @@ def get_boards():
     except Exception as error:
         return jsonify({"Error":str(error)}), 500
 
+
+#OBTENER MIS TABLEROS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getMyBoards",methods=["GET"])
 @jwt_required()
 def get_my_boards():
@@ -178,7 +181,7 @@ def add_member_to_board(board_id):
         db.session.rollback()
         return jsonify({"Error":str(error)}),500
 
-
+#OBTENER UN TABLERO POR ID-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
 @jwt_required()
 def get_board_by_id(board_id):
