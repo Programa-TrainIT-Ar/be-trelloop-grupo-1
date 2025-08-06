@@ -23,7 +23,7 @@ def upload_image_to_s3(base64_image, filename):
     header, encoded = base64_image.split(",", 1)
     binary_data = base64.b64decode(encoded)
 
-    s3.upload_fileobj(
+    s3.upload_fileobj( 
         BytesIO(binary_data),
         BUCKET_NAME,
         filename,
@@ -283,3 +283,48 @@ def delete_board(board_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": "Ocurrió un error al eliminar el tablero", "details": str(error)}), 500
+
+# BÚSQUEDA DE USUARIOS PARA AGREGAR COMO MIEMBROS -----------------------------------
+@board_bp.route("/users/search", methods=["GET"])
+@jwt_required()
+def search_users():
+    try:
+        # Obtener parámetro de búsqueda
+        query = request.args.get("q", "").strip()
+
+        if not query or len(query) < 2:
+            return jsonify({
+                "success": True,
+                "users": [],
+                "message": "Ingrese al menos 2 caracteres para buscar"
+            }), 200
+
+        # Buscar por nombre, apellido o email
+        users = User.query.filter(
+            db.or_(
+                User.first_name.ilike(f"%{query}%"),
+                User.last_name.ilike(f"%{query}%"),
+                User.email.ilike(f"%{query}%")
+            )
+        ).limit(10).all()
+
+        # Serializar resultados
+        users_serialized = [{
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email
+        } for user in users]
+
+        return jsonify({
+            "success": True,
+            "users": users_serialized,
+            "count": len(users_serialized)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": "Error al buscar usuarios",
+            "details": str(e)
+        }), 500
