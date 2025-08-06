@@ -197,63 +197,104 @@ def get_board_by_id(board_id):
     except Exception as error:
         return jsonify({"Error":str(error)}),500
 
-# @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
-# @jwt_required()
-# def favorite_board(board_id):
+@board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
+@jwt_required()
+def favorite_board(board_id):
+   try:
+       user_id=get_jwt_identity()
+       user=User.query.get(user_id)
+       if not user:
+           return jsonify({"Warning":"Usuario no encontrado"}),404
+       board=Board.query.get(board_id)
+       if not board:
+           return jsonify({"Warning":"Tablero no encontrado"}),404
+       if board in user.favorites:
+           return jsonify({"Warning":"El tablero ya está en favoritos"}),400
+       user.favorites.append(board)
+       db.session.commit()
+       
+       return jsonify({"message":"Tablero agregado a favoritos"}),200
+   except Exception as error:
+       db.session.rollback()
+       return jsonify({"Warning":str(error)}),500
+   
+@board_bp.route("/getFavoriteBoards",methods=["GET"])
+@jwt_required()
+def get_favorite_boards():
+    try:
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        favorite_boards=user.favorites
+        return jsonify([board.serialize() for board in favorite_boards]),200
+    except Exception as error:
+           return jsonify({"Warning":str(error)}),500
 
+@board_bp.route("/removeFavoriteBoard/<int:board_id>",methods=["DELETE"])
+@jwt_required() 
+def remove_favorite_board(board_id):
+    try:
+        user_id=get_jwt_identity()
+        user=User.query.get(user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        board=Board.query.get(board_id)
+        if not board:
+            return jsonify({"Warning":"Tablero no encontrado"}),404
+        if board not in user.favorites:
+            return jsonify({"Warning":"El tablero no está en favoritos"}),400
+        user.favorites.remove(board)
+        db.session.commit()
+        return jsonify({"message":"Tablero eliminado de favoritos"}),200
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Warning":str(error)}),500
+    
 #ACTUALIZAR UN TABLERO EXISTENTE
 
 @board_bp.route("/updateBoard/<int:board_id>", methods=["PUT"])
 @jwt_required()
 def update_board(board_id):
     try:
-        current_user_id = get_jwt_identity()
-        board = Board.query.get(board_id)
-
-        # 1. Verificar si el tablero existe
+        current_user_id=get_jwt_identity()
+        user=User.query.get(current_user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        board=Board.query.get(board_id)
         if not board:
+            return jsonify({"Warning":"Tablero no encontrado"}),404
+        if board.user_id != user.id:
+            return jsonify({"Warning":"No tienes permiso para actualizar este tablero"}),403
+          # Recibir datos del formulario
+        name = request.form.get("name")
+        description = request.form.get("description", "")
+        is_public = request.form.get("isPublic", "false").lower() == "true"
 
-            return jsonify({"error": "Tablero no encontrado"}), 404
+        # Recibir archivo de imagen
+        image_file = request.files.get("image")
+        image_url = None
 
-        # 2. Verificar si el usuario actual es el propietario del tablero
-        # verificar porque quizas si deban editar un tablero que no le pertenece
-        if board.user_id != current_user_id:
-            return jsonify({"error": "No tienes permiso para editar este tablero"}), 403
+        if image_file:
+            try:
+                # Convertir imagen a base64 para subirla con función personalizada
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+                base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
+                filename = f"boards/{uuid.uuid4().hex}.png"
+                image_url = upload_image_to_s3(base64_image, filename)
+            except Exception as e:
+                return jsonify({"error": "Error uploading image", "details": str(e)}), 500
+        
+        board.name = name
+        board.description = description
+        board.is_public = is_public
 
-        # 3. Actualizar los campos proporcionados en la solicitud
-        # Se usa request.form.get() para evitar errores si un campo no se envía
-        if "name" in request.form:
-            board.name = request.form.get("name")
-        if "description" in request.form:
-            board.description = request.form.get("description")
-        if "isPublic" in request.form:
-            board.is_public = request.form.get("isPublic").lower() == "true"
-
-        # 4. Actualizar la imagen si se proporciona una nueva
-        if "image" in request.files:
-            image_file = request.files.get("image")
-            if image_file:
-                try:
-                    # Nota: Sería ideal eliminar la imagen antigua de S3 aquí
-                    encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-                    base64_image = f"data:{image_file.content_type};base64,{encoded_image}"
-                    filename = f"boards/{uuid.uuid4().hex}.png"
-                    board.image = upload_image_to_s3(base64_image, filename)
-                except Exception as e:
-                    return jsonify({"error": "Error al subir la nueva imagen", "details": str(e)}), 500
-
-        # 5. Guardar los cambios en la base de datos
         db.session.commit()
-
-        return jsonify({
-            "message": "Tablero actualizado exitosamente",
-            "board": board.serialize()
-        }), 200
-
+        db.session.commit()
+        return jsonify({"message": "Tablero actualizado exitosamente"}), 200
     except Exception as error:
         db.session.rollback()
-        return jsonify({"error": "Ocurrió un error al actualizar el tablero", "details": str(error)}), 500
-
+        return jsonify({"error":str(error)}),500
 
 # ELIMINAR UN TABLERO
 #----------------------------------------------------------------------------------------------
