@@ -20,6 +20,12 @@ card_user_association = db.Table('card_user_association',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True)
 )
 
+#Tabla pivote para declaracion de muchos a muchos entre favoritos y usuarios
+favorite_boards = db.Table('favorite_boards',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True)
+)
+
 class Message(db.Model):
      id = db.Column(db.Integer, primary_key=True)
      content = db.Column(db.String(255), nullable=False)
@@ -34,6 +40,7 @@ class User(db.Model):
     # profile_image = db.Column(db.String(500), nullable=True)  # Campo para almacenar la URL de la imagen
 
     boards = db.relationship('Board', secondary='board_user_association', back_populates='members')
+    favorites = db.relationship('Board', secondary='favorite_boards', backref='favorited_by')
 
     def set_password(self, password):
         # Guarda la contraseña encriptada
@@ -73,6 +80,8 @@ class Board(db.Model):
     is_public = db.Column(db.Boolean, default=False) # Indica si el tablero es público o privado, por defecto será privado.
 
     cards = db.relationship('Card', back_populates='board')
+   
+
 
     def serialize(self):
         return {
