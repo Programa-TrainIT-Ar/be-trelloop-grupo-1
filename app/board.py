@@ -145,6 +145,7 @@ def get_my_boards():
     except Exception as error:
         return jsonify({"Error":str(error)}),500
 
+# AÑADIR MIEMBRO A UN TABLERO-------------------------------------------------------------------------------------------------------        
 @board_bp.route("/addMember/<int:board_id>", methods=["POST"])
 @jwt_required()
 def add_member_to_board(board_id):
@@ -200,6 +201,7 @@ def get_board_by_id(board_id):
     except Exception as error:
         return jsonify({"Error":str(error)}),500
 
+#AÑADIR TABLERO A FAVORITOS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])
 @jwt_required()
 def favorite_board(board_id):
@@ -220,7 +222,8 @@ def favorite_board(board_id):
    except Exception as error:
        db.session.rollback()
        return jsonify({"Warning":str(error)}),500
-   
+
+#OBTENER TABLEROS FAVORITOS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getFavoriteBoards",methods=["GET"])
 @jwt_required()
 def get_favorite_boards():
@@ -234,6 +237,7 @@ def get_favorite_boards():
     except Exception as error:
            return jsonify({"Warning":str(error)}),500
 
+#ELIMINAR TABLERO DE FAVORITOS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/removeFavoriteBoard/<int:board_id>",methods=["DELETE"])
 @jwt_required() 
 def remove_favorite_board(board_id):
@@ -254,8 +258,7 @@ def remove_favorite_board(board_id):
         db.session.rollback()
         return jsonify({"Warning":str(error)}),500
     
-#ACTUALIZAR UN TABLERO EXISTENTE
-
+#ACTUALIZAR UN TABLERO EXISTENTE----------------------------------------------------------------------------------------------
 @board_bp.route("/updateBoard/<int:board_id>", methods=["PUT"])
 @jwt_required()
 def update_board(board_id):
@@ -299,8 +302,7 @@ def update_board(board_id):
         db.session.rollback()
         return jsonify({"error":str(error)}),500
 
-# ELIMINAR UN TABLERO
-#----------------------------------------------------------------------------------------------
+# ELIMINAR UN TABLERO----------------------------------------------------------------------------------------------
 @board_bp.route("/deleteBoard/<int:board_id>", methods=["DELETE"])
 @jwt_required()
 def delete_board(board_id):
@@ -331,7 +333,7 @@ def delete_board(board_id):
         db.session.rollback()
         return jsonify({"error": "Ocurrió un error al eliminar el tablero", "details": str(error)}), 500
 
-# BÚSQUEDA DE USUARIOS PARA AGREGAR COMO MIEMBROS -----------------------------------
+# BÚSQUEDA DE USUARIOS PARA AGREGAR COMO MIEMBROS---------------------------------------------------------------------------------------
 @board_bp.route("/users/search", methods=["GET"])
 @jwt_required()
 def search_users():
