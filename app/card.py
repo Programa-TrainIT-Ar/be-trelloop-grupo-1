@@ -59,8 +59,29 @@ def create_card():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# MOSTRAR TARJETAS (TODOS)-------------------------------------------------------------------------------------------------------
+# MOSTRAR TARJETAS DE UN TABLERO (TODOS)-------------------------------------------------------------------------------------------------------
+@card_bp.route("/getCards/<int:board_id>", methods=["GET"])
+@jwt_required()
+def get_all_cards(board_id):
+    try:
+        all_cards = Card.query.filter_by(board_id = board_id)
+        if not all_cards:
+            return jsonify({"Error": "Tablero no encontrado"}), 404
+        return jsonify([card.serialize() for card in all_cards]), 200
+    except Exception as error:
+        return jsonify({"error": "Se ha producido un error al obtener las tarjetas", "details": str(error)}), 500
+
 # MOSTRAR TARJETAS POR ID-------------------------------------------------------------------------------------------------------
+@card_bp.route("/getCard/<int:card_id>", methods=["GET"])
+@jwt_required()
+def get_card(card_id):
+    try:
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"Error": "Tarjeta no encontrada"}), 404
+        return jsonify(card.serialize()), 200
+    except Exception as error:
+        return jsonify({"error": "Se ha producido un error al obtener la tarjeta", "details": str(error)}), 500
 # ACTUALIZAR UNA TARJETA EXISTENTE----------------------------------------------------------------------------------------------
 # ELIMINAR UNA TARJETA----------------------------------------------------------------------------------------------
 # AGREGAR MIEMBROS A UNA TARJETA-------------------------------------------------------------------------------------------------------
