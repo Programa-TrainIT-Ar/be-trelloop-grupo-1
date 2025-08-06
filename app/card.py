@@ -1,7 +1,8 @@
-from flask import request, jsonify
-from flask_jwt_extended import jwt_required
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Card, State
+from .models import db, Board, Card, State
 
 
 card_bp = Blueprint("card", __name__)
@@ -13,7 +14,7 @@ def handle_options_request():
         return '', 204
 
 # CREAR TARJETAS-------------------------------------------------------------------------------------------------------
-@card_bp.route('/cards', methods=['POST'])
+@card_bp.route('/createCard', methods=['POST'])
 @jwt_required()
 def create_card():
     try:
@@ -80,8 +81,46 @@ def get_card(card_id):
         return jsonify(card.serialize()), 200
     except Exception as error:
         return jsonify({"error": "Se ha producido un error al obtener la tarjeta", "details": str(error)}), 500
+
 # ACTUALIZAR UNA TARJETA EXISTENTE----------------------------------------------------------------------------------------------
-# ELIMINAR UNA TARJETA----------------------------------------------------------------------------------------------
-# AGREGAR MIEMBROS A UNA TARJETA-------------------------------------------------------------------------------------------------------
-# ELIMINAR MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
-# OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
+@card_bp.route("/updateCard/<int:card_id>", methods=["PUT"])
+@jwt_required()
+def update_card(card_id):
+    try:
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        data = request.get_json()
+
+        card.title = data.get("title", card.title)
+        card.description = data.get("description", card.description)
+        card.responsable_id = data.get("responsableId", card.responsable_id)
+        card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
+        card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
+        card.state = data.get("state", card.state)
+
+        db.session.commit()
+        return jsonify({"message": "Tarjeta actualizada correctamente", "card": card.serialize()}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
+
+# ELIMINAR UNA TARJETA---------------------------------------------------------------------------------------------------------------
+@card_bp.route("/deleteCard/<int:card_id>", methods=["DELETE"])
+@jwt_required()
+def delete_card(card_id):
+    try:
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        db.session.delete(card)
+        db.session.commit()
+        return jsonify({"message": "Tarjeta eliminada correctamente"}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": "Error al eliminar la tarjeta", "details": str(error)}), 500
+
