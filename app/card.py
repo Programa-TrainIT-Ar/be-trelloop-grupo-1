@@ -7,7 +7,7 @@ from .models import db, Card, State
 card_bp = Blueprint("card", __name__)
 CORS(card_bp)
 
-@board_bp.before_request
+@card_bp.before_request
 def handle_options_request():
     if request.method == 'OPTIONS':
         return '', 204
