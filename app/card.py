@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State
+from .models import db, Board, Card, State,User
 
 
 card_bp = Blueprint("card", __name__)
@@ -132,7 +132,7 @@ def delete_card(card_id):
 def add_memember(card_id):
     try:
         current_user_id=get_jwt_identity()
-        user=User.query.get(current_user_id)
+        user= User.query.get(current_user_id)
         if not user:
             return jsonify({"Warning":"Usuario no encontrado"}),404
         

@@ -311,6 +311,11 @@ def delete_board(board_id):
     """
     try:
         current_user_id = get_jwt_identity()
+        user=User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+        
         board = Board.query.get(board_id)
 
         # 1. Verificar si el tablero existe
@@ -318,7 +323,7 @@ def delete_board(board_id):
             return jsonify({"error": "Tablero no encontrado"}), 404
 
         # 2. Verificar si el usuario actual es el propietario del tablero
-        if board.user_id != current_user_id:
+        if board.user_id != user.id:
             return jsonify({"error": "No tienes permiso para eliminar este tablero"}), 403
 
         # Nota: Sería ideal eliminar la imagen asociada de S3 aquí para no dejar archivos huérfanos.
