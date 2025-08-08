@@ -124,3 +124,54 @@ def delete_card(card_id):
         db.session.rollback()
         return jsonify({"error": "Error al eliminar la tarjeta", "details": str(error)}), 500
 
+
+# ELIMINAR UNA TARJETA----------------------------------------------------------------------------------------------
+# AGREGAR MIEMBROS A UNA TARJETA-------------------------------------------------------------------------------------------------------
+@card_bp.route('/addMembers/<int:card_id>', methods=['POST'])
+@jwt_required()
+def add_memember(card_id):
+    try:
+        current_user_id=get_jwt_identity()
+        user=User.query.get(current_user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        
+        data=request.get_json()
+        user_id=data.get("userId")
+        print(request.data)
+        print(request.get_json())
+
+        if not user_id:
+            return jsonify({"Warning":"Datos incompletos"}),400
+        
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"Warning":"Tarjeta no encontrada"}),404
+        
+        user_to_add = User.query.get(user_id)
+        if not user_to_add:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        if user_to_add in card.members:
+            return jsonify({"Warning":"El usuario ya es miembro de la tarjeta"}),400
+        
+        card.members.append(user_to_add)
+        db.session.commit()
+        return jsonify({"Message":"Miembro agregado correctamente"}),200   
+      
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Warning":str(error)}),500
+ 
+# ELIMINAR MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
+# OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
+@card_bp.route("getMembers/<int:card_id>", methods=['GET'])
+@jwt_required()
+def get_members(card_id):
+    try:
+        card=Card.query.get(card_id)
+        if not card:
+            return jsonify({"Warning":"Tarjeta no encontrada"}),404
+        members=[member.serialize() for member in card.members]
+        return jsonify(members),200
+    except Exception as error:
+        return jsonify({"Warning":str(error)}),500
