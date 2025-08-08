@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State
+from .models import db, Board, Card, State, User
 
 
 card_bp = Blueprint("card", __name__)
