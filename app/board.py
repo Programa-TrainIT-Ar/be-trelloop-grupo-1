@@ -7,6 +7,7 @@ from .models import db, User, Board, Tag
 import uuid
 import boto3
 import base64
+from sqlalchemy import or_
 
 board_bp = Blueprint("board", __name__)
 CORS(board_bp)
@@ -346,7 +347,7 @@ def search_users():
                 "message": "Ingrese al menos 2 caracteres para buscar"
             }), 200
 
-        # Buscar por nombre, apellido o email
+        #Buscar por nombre, apellido o email
         users = User.query.filter(
             db.or_(
                 User.first_name.ilike(f"%{query}%"),
@@ -355,7 +356,6 @@ def search_users():
             )
         ).limit(10).all()
 
-        # Serializar resultados
         users_serialized = [{
             "id": user.id,
             "first_name": user.first_name,
