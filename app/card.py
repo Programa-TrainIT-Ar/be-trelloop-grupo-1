@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State,User
+from .models import db, Board, Card, State, User
 
 
 card_bp = Blueprint("card", __name__)
@@ -124,8 +124,6 @@ def delete_card(card_id):
         db.session.rollback()
         return jsonify({"error": "Error al eliminar la tarjeta", "details": str(error)}), 500
 
-
-# ELIMINAR UNA TARJETA----------------------------------------------------------------------------------------------
 # AGREGAR MIEMBROS A UNA TARJETA-------------------------------------------------------------------------------------------------------
 @card_bp.route('/addMembers/<int:card_id>', methods=['POST'])
 @jwt_required()
