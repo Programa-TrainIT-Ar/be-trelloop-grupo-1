@@ -79,7 +79,7 @@ class Board(db.Model):
     tags = db.relationship('Tag', secondary='board_tag_association', back_populates='boards')
     is_public = db.Column(db.Boolean, default=False) # Indica si el tablero es público o privado, por defecto será privado.
 
-    cards = db.relationship('Card', back_populates='board')
+    cards = db.relationship("Card", backref="board", cascade="all, delete-orphan")
    
 
 
@@ -124,9 +124,9 @@ class Card(db.Model):
     begin_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
-    board_id = db.Column(db.Integer, db.ForeignKey('boards.id'), nullable=False)
+    board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
 
-    board = db.relationship('Board', back_populates='cards')
+   
     members = db.relationship('User', secondary='card_user_association', backref='cards')
 
     def serialize(self):
