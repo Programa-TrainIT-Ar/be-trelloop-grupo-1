@@ -205,7 +205,40 @@ def add_memember(card_id):
         db.session.rollback()
         return jsonify({"Warning": str(error)}), 500
  
-# ELIMINAR MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
+# ELIMINAR MIEMBROS DE UNA TARJETA -----------------------------------------------------------
+@card_bp.route("/removeMember/<int:card_id>", methods=["DELETE"])
+@jwt_required()
+def remove_member_from_card(card_id):
+    try:
+        current_user_id = get_jwt_identity()
+        requester = User.query.get(current_user_id)
+        if not requester:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        data = request.get_json() or {}
+        user_id = data.get("userId")
+        if not user_id:
+            return jsonify({"error": "Falta 'userId' en el cuerpo"}), 400
+
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        user_to_remove = User.query.get(user_id)
+        if not user_to_remove:
+            return jsonify({"error": "Usuario a eliminar no encontrado"}), 404
+
+        if user_to_remove not in card.members:
+            return jsonify({"error": "El usuario no es miembro de esta tarjeta"}), 400
+
+        card.members.remove(user_to_remove)
+        db.session.commit()
+        return jsonify({"message": "Miembro eliminado correctamente"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 # OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
 @card_bp.route("getMembers/<int:card_id>", methods=['GET'])
 @jwt_required()
