@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State, User
+from .models import db, Board, Card, State, User, Tag
 
 
 card_bp = Blueprint("card", __name__)
@@ -98,7 +98,27 @@ def update_card(card_id):
         card.responsable_id = data.get("responsableId", card.responsable_id)
         card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
         card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
-        card.state = data.get("state", card.state)
+        
+        # ARREGLAR: Convertir string a Enum State
+        state_value = data.get("state")
+        if state_value:
+            if state_value == "TODO":
+                card.state = State.TODO
+            elif state_value == "IN_PROGRESS":
+                card.state = State.IN_PROGRESS
+            elif state_value == "DONE":
+                card.state = State.DONE
+
+        # Manejar etiquetas
+        if 'tags' in data:
+            card.tags.clear()
+            for tag_name in data['tags']:
+                if tag_name.strip():
+                    tag = Tag.query.filter_by(name=tag_name.strip()).first()
+                    if not tag:
+                        tag = Tag(name=tag_name.strip())
+                        db.session.add(tag)
+                    card.tags.append(tag)
 
         db.session.commit()
         return jsonify({"message": "Tarjeta actualizada correctamente", "card": card.serialize()}), 200
@@ -106,6 +126,7 @@ def update_card(card_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
+
 
 # ELIMINAR UNA TARJETA---------------------------------------------------------------------------------------------------------------
 @card_bp.route("/deleteCard/<int:card_id>", methods=["DELETE"])
@@ -195,7 +216,7 @@ def remove_member_from_card(card_id):
         return jsonify({"error": str(e)}), 500
 
 # OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
-@card_bp.route("getMembers/<int:card_id>", methods=['GET'])
+@card_bp.route("/getMembers/<int:card_id>", methods=['GET'])
 @jwt_required()
 def get_members(card_id):
     try:
@@ -206,3 +227,6 @@ def get_members(card_id):
         return jsonify(members),200
     except Exception as error:
         return jsonify({"Warning":str(error)}),500
+    
+
+

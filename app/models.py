@@ -26,6 +26,14 @@ favorite_boards = db.Table('favorite_boards',
     db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True)
 )
 
+# Agregar esta tabla card y etiquetas para la relación muchos a muchos entre tarjetas y etiquetas:
+card_tag_association = db.Table('card_tag_association',
+    db.Column('card_id', db.Integer, db.ForeignKey('cards.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
+)
+
+
+
 class Message(db.Model):
      id = db.Column(db.Integer, primary_key=True)
      content = db.Column(db.String(255), nullable=False)
@@ -125,6 +133,8 @@ class Card(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
+    tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
+
 
    
     members = db.relationship('User', secondary='card_user_association', backref='cards')
@@ -140,5 +150,6 @@ class Card(db.Model):
             "dueDate": self.due_date.isoformat() if self.due_date else None,
             "state": self.state.value,
             "boardId": self.board_id,
+            "tags":[tag.name for tag in self.tags],
             "members": [member.serialize() for member in self.members]
         }
