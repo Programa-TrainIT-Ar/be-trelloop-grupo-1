@@ -142,3 +142,50 @@ class Card(db.Model):
             "boardId": self.board_id,
             "members": [member.serialize() for member in self.members]
         }
+    
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)  
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Tipo y contenido
+    type = db.Column(db.String(50), nullable=False)        
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+
+    # Recurso relacionado (opcional)
+    resource_kind = db.Column(db.String(20), nullable=True)  
+    resource_id = db.Column(db.Integer, nullable=True)
+
+    # Actor que originó el evento (opcional)
+    actor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    # Estado y tiempo
+    read = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+    # Idempotencia (opcional pero útil)
+    event_id = db.Column(db.String(100), unique=True, nullable=True)
+
+    # Índices para consultas típicas
+    __table_args__ = (
+        db.Index("idx_notifications_user_read_created", "user_id", "read", "created_at"),
+    )
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "userId": self.user_id,
+            "type": self.type,
+            "title": self.title,
+            "message": self.message,
+            "resource": (
+                {"kind": self.resource_kind, "id": self.resource_id}
+                if self.resource_kind and self.resource_id is not None else None
+            ),
+            "actorId": self.actor_id,
+            "read": self.read,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "eventId": self.event_id,
+        }

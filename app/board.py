@@ -8,6 +8,7 @@ import uuid
 import boto3
 import base64
 from sqlalchemy import or_
+from .services.notifications import create_notification
 
 board_bp = Blueprint("board", __name__)
 CORS(board_bp)
@@ -151,37 +152,60 @@ def get_my_boards():
 @jwt_required()
 def add_member_to_board(board_id):
     try:
-        #Obtengo el usuario actual
-        user_id=get_jwt_identity()
-        user=User.query.get(user_id)
-        if not user:
-            return jsonify({"Error":"Usuario no encontrado"}),404
+        # Obtengo el usuario actual (actor)
+        actor_id = get_jwt_identity()
+        actor = User.query.get(actor_id)
+        if not actor:
+            return jsonify({"Error": "Usuario no encontrado"}), 404
 
         # Obtengo el tablero al que se le quiere agregar un miembro
-        board=Board.query.get(board_id)
+        board = Board.query.get(board_id)
         if not board:
-            return jsonify({"Error":"Tablero no encontrado"}),404
+            return jsonify({"Error": "Tablero no encontrado"}), 404
 
         # Obtengo el ID del miembro a agregar desde el cuerpo de la solicitud
-        member_id=request.json.get("member_id")
+        member_id = request.json.get("member_id")
         if not member_id:
-            return jsonify({"Error":"ID no encontrado"}),400
+            return jsonify({"Error": "ID no encontrado"}), 400
 
-        member=User.query.get(member_id)
+        member = User.query.get(member_id)
         if not member:
-            return jsonify({"Error":"Miembro no encontrado"}),404
+            return jsonify({"Error": "Miembro no encontrado"}), 404
 
         if member in board.members:
-            return jsonify({"Error":"El miembro ya está en el tablero"}),400
-
+            return jsonify({"Error": "El miembro ya está en el tablero"}), 400
 
         # Agrego el miembro al tablero
         board.members.append(member)
         db.session.commit()
+
+        # Generar event_id para idempotencia
+        event_id = f"board:{board_id}:member_added:{member.id}"
+
+        # Crear notificación (persistida, emitida por pusher y opcional email)
+        try:
+            create_notification(
+                db.session,
+                user_id=str(member.id),
+                type_="BOARD_MEMBER_ADDED",
+                title="Has sido agregado a un tablero",
+                message=f"{actor.first_name} {actor.last_name} te agregó al tablero '{board.name}'.",
+                resource_kind="board",
+                resource_id=str(board.id),
+                actor_id=str(actor.id),
+                event_id=event_id,
+                user_email=member.email,
+                send_email_also=True
+            )
+        except Exception as notif_err:
+            # No fallamos la operación principal por error en notificación; registramos y seguimos
+            print(f"[Notification Error] {notif_err}")
+
         return jsonify({"message": "Miembro agregado exitosamente"}), 200
     except Exception as error:
         db.session.rollback()
-        return jsonify({"Error":str(error)}),500
+        return jsonify({"Error": str(error)}), 500
+
 
 #OBTENER UN TABLERO POR ID-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getBoard/<int:board_id>", methods=["GET"])
