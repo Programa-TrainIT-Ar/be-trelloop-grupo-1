@@ -133,6 +133,7 @@ class Card(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
+    
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
 
 
