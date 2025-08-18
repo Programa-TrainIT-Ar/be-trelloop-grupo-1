@@ -1,24 +1,29 @@
-# ==================== COMIENZO ====================
 openapi: 3.0.3
 info:
   title: Trelloop API - Backend Grupo 1
   description: |
-    API REST para el sistema de gestión de tareas colaborativo Trelloop.
+    API REST para la aplicación Trelloop, un clon de Trello desarrollado como parte del programa TrainIT.
+
+    Esta API proporciona endpoints para:
+    - **Autenticación**: Registro, login y gestión de tokens JWT
+    - **Tableros**: Crear, leer, actualizar y eliminar tableros colaborativos
+    - **Tarjetas**: Gestión completa de tarjetas dentro de los tableros
+    - **Etiquetas**: Sistema de categorización mediante tags
+    - **Usuarios**: Búsqueda y gestión de miembros
+    - **Mensajes**: Sistema básico de mensajería (ejemplo/prueba)
 
     ## Autenticación
-    Esta API utiliza tokens JWT (JSON Web Tokens) para la autenticación.
+    La API utiliza JWT (JSON Web Tokens) para la autenticación. Los endpoints protegidos requieren
+    un token de acceso válido en el header `Authorization: Bearer <token>`.
 
-    ### Proceso de autenticación:
-    1. Registrarse o iniciar sesión para obtener tokens
-    2. Incluir el access_token en el header Authorization: `Bearer {token}`
-    3. Usar el refresh_token para renovar tokens expirados
-
-    ## Características principales
-    - Gestión de usuarios con autenticación JWT
-    - Tableros colaborativos estilo Trello
-    - Soporte para imágenes de perfil (Amazon S3)
-    - Sistema de etiquetas para organización
-    - Mensajería básica
+    ## Códigos de respuesta
+    - **200**: Operación exitosa
+    - **201**: Recurso creado exitosamente
+    - **400**: Datos inválidos o faltantes
+    - **401**: Token inválido o expirado
+    - **404**: Recurso no encontrado
+    - **409**: Conflicto (ej: email ya registrado)
+    - **500**: Error interno del servidor
   version: 1.0.0
   contact:
     name: Grupo 1 - Trelloop
@@ -30,18 +35,18 @@ info:
 servers:
   - url: http://localhost:5000
     description: Servidor de desarrollo local
-  - url: ""
+  - url: https://your-production-url.com
     description: Servidor de producción
 
 paths:
-  # ==================== AUTENTICACIÓN ====================
+  # ============ AUTENTICACIÓN ============
   /auth/login:
     post:
       tags:
         - Autenticación
       summary: Iniciar sesión
       description: |
-        Autentica a un usuario con email y contraseña, devolviendo tokens JWT para acceso y renovación.
+        Autentica un usuario existente con email y contraseña.
       operationId: login
       requestBody:
         required: true
@@ -61,14 +66,14 @@ paths:
                 password:
                   type: string
                   format: password
-                  example: "miPassword123"
+                  example: "miContraseña123"
                   description: Contraseña del usuario
             examples:
               ejemplo_login:
                 summary: Login de ejemplo
                 value:
-                  email: "juan.perez@ejemplo.com"
-                  password: "Password123!"
+                  email: "usuario@ejemplo.com"
+                  password: "miContraseña123"
       responses:
         "200":
           description: Login exitoso
@@ -84,11 +89,11 @@ paths:
                     $ref: "#/components/schemas/User"
                   access_token:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                     description: Token JWT para autorizaciones
                   refresh_token:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                     description: Token para renovar el access_token
                   token_type:
                     type: string
@@ -104,7 +109,7 @@ paths:
                 datos_faltantes:
                   summary: Campos requeridos faltantes
                   value:
-                    error: "Correo y contraseña son requeridos"
+                    error: "Correo o contraseña invalidos"
         "401":
           description: Credenciales incorrectas
           content:
@@ -112,7 +117,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                error: "Credenciales incorrectas"
+                error: "Correo o contraseña incorrectos"
         "404":
           description: Usuario no encontrado
           content:
@@ -120,7 +125,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                error: "El usuario no existe"
+                error: "Usuario no encontrado"
         "500":
           description: Error interno del servidor
           content:
@@ -134,8 +139,8 @@ paths:
         - Autenticación
       summary: Registrar nuevo usuario
       description: |
-        Crea una nueva cuenta de usuario. Opcionalmente puede incluir una URL de imagen de perfil.
-        La imagen debe estar previamente subida a Amazon S3.
+        Crea una nueva cuenta de usuario. El email debe ser único en el sistema.
+        La imagen de perfil es opcional y se almacena en Amazon S3.
       operationId: register
       requestBody:
         required: true
@@ -151,14 +156,14 @@ paths:
               properties:
                 firstName:
                   type: string
-                  minLength: 2
-                  maxLength: 70
+                  minLength: 1
+                  maxLength: 50
                   example: "Juan"
                   description: Nombre del usuario
                 lastName:
                   type: string
-                  minLength: 2
-                  maxLength: 70
+                  minLength: 1
+                  maxLength: 50
                   example: "Pérez"
                   description: Apellido del usuario
                 email:
@@ -169,30 +174,30 @@ paths:
                 password:
                   type: string
                   minLength: 8
-                  example: "Password123!"
+                  example: "miContraseña123"
                   description: Contraseña del usuario (mínimo 8 caracteres)
                 profileImage:
                   type: string
                   format: uri
                   nullable: true
-                  example: "https://mi-bucket.s3.amazonaws.com/profile-images/usuario123.jpg"
+                  example: "https://trainit404.s3.amazonaws.com/perfil_123.png"
                   description: URL de la imagen de perfil almacenada en Amazon S3
             examples:
               registro_completo:
                 summary: Registro con imagen
                 value:
-                  firstName: "María"
-                  lastName: "González"
-                  email: "maria.gonzalez@ejemplo.com"
-                  password: "MiPassword123!"
-                  profileImage: "https://bucket.s3.amazonaws.com/profiles/maria.jpg"
+                  firstName: "Juan"
+                  lastName: "Pérez"
+                  email: "juan.perez@ejemplo.com"
+                  password: "miContraseña123"
+                  profileImage: "https://trainit404.s3.amazonaws.com/perfil_123.png"
               registro_basico:
                 summary: Registro sin imagen
                 value:
-                  firstName: "Carlos"
-                  lastName: "Rodríguez"
-                  email: "carlos.rodriguez@ejemplo.com"
-                  password: "Password123!"
+                  firstName: "María"
+                  lastName: "García"
+                  email: "maria.garcia@ejemplo.com"
+                  password: "miContraseña456"
       responses:
         "201":
           description: Usuario registrado exitosamente
@@ -208,10 +213,10 @@ paths:
                     $ref: "#/components/schemas/User"
                   access_token:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                   refresh_token:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                   token_type:
                     type: string
                     example: "Bearer"
@@ -225,11 +230,11 @@ paths:
                 campos_requeridos:
                   summary: Campos faltantes
                   value:
-                    error: "Todos los campos son requeridos"
+                    error: "Datos incompletos"
                 correo_invalido:
                   summary: Formato de correo inválido
                   value:
-                    error: "Correo inválido"
+                    error: "El formato del correo electrónico es inválido"
         "409":
           description: Conflicto - Email ya registrado
           content:
@@ -237,7 +242,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                error: "El correo ya está registrado"
+                error: "El correo electrónico ya está registrado"
         "500":
           description: Error interno del servidor
           content:
@@ -251,8 +256,8 @@ paths:
         - Autenticación
       summary: Renovar token de acceso
       description: |
-        Genera un nuevo access_token usando un refresh_token válido.
-        Útil cuando el access_token ha expirado.
+        Utiliza un refresh token válido para obtener un nuevo access token.
+        El refresh token debe enviarse en el header Authorization.
       operationId: refreshToken
       security:
         - BearerAuthRefresh: []
@@ -266,7 +271,7 @@ paths:
                 properties:
                   access_token:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                     description: Nuevo token de acceso
                   token_type:
                     type: string
@@ -296,8 +301,8 @@ paths:
         - Autenticación
       summary: Obtener perfil del usuario autenticado
       description: |
-        Devuelve la información del perfil del usuario actualmente autenticado.
-        Requiere un access_token válido.
+        Retorna la información del usuario actualmente autenticado.
+        Requiere un token de acceso válido.
       operationId: getUserProfile
       security:
         - BearerAuth: []
@@ -330,14 +335,1260 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  # ==================== MENSAJES ====================
+  # ============ TABLEROS ============
+  /board/createBoard:
+    post:
+      tags:
+        - Tableros
+      summary: Crear nuevo tablero
+      description: Crea un nuevo tablero colaborativo. El usuario autenticado se convierte en el propietario.
+      operationId: createBoard
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "Proyecto Frontend"
+                  description: Nombre del tablero
+                description:
+                  type: string
+                  nullable: true
+                  example: "Tablero para gestionar las tareas del frontend"
+                  description: Descripción del tablero
+                image:
+                  type: string
+                  nullable: true
+                  example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+                  description: Imagen en formato base64
+                isPublic:
+                  type: boolean
+                  example: false
+                  description: Indica si el tablero es público o privado
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: ["desarrollo", "frontend"]
+                  description: Lista de etiquetas asociadas al tablero
+      responses:
+        "201":
+          description: Tablero creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tablero creado correctamente"
+                  board:
+                    $ref: "#/components/schemas/Board"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/getBoards:
+    get:
+      tags:
+        - Tableros
+      summary: Obtener todos los tableros accesibles
+      description: Retorna todos los tableros a los que el usuario tiene acceso (propios y compartidos).
+      operationId: getBoards
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de tableros obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Board"
+        "401":
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/getMyBoards:
+    get:
+      tags:
+        - Tableros
+      summary: Obtener tableros propios
+      description: Retorna solo los tableros creados por el usuario autenticado.
+      operationId: getMyBoards
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de tableros propios obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Board"
+        "401":
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/addMember/{board_id}:
+    post:
+      tags:
+        - Tableros
+      summary: Agregar miembro a tablero
+      description: Agrega un nuevo miembro a un tablero existente.
+      operationId: addMemberToBoard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                  description: ID del usuario a agregar
+      responses:
+        "200":
+          description: Miembro agregado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                    example: "Miembro agregado correctamente"
+        "400":
+          description: Datos inválidos o usuario ya es miembro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tablero o usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/getBoard/{board_id}:
+    get:
+      tags:
+        - Tableros
+      summary: Obtener tablero por ID
+      description: Retorna la información detallada de un tablero específico.
+      operationId: getBoardById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      responses:
+        "200":
+          description: Tablero obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Board"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/favoriteBoard/{board_id}:
+    post:
+      tags:
+        - Tableros
+      summary: Marcar tablero como favorito
+      description: Agrega un tablero a la lista de favoritos del usuario.
+      operationId: favoriteBoard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      responses:
+        "200":
+          description: Tablero marcado como favorito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                    example: "Tablero agregado a favoritos"
+        "400":
+          description: Tablero ya está en favoritos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/getFavoriteBoards:
+    get:
+      tags:
+        - Tableros
+      summary: Obtener tableros favoritos
+      description: Retorna la lista de tableros marcados como favoritos por el usuario.
+      operationId: getFavoriteBoards
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de tableros favoritos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Board"
+        "401":
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/removeFavoriteBoard/{board_id}:
+    delete:
+      tags:
+        - Tableros
+      summary: Quitar tablero de favoritos
+      description: Remueve un tablero de la lista de favoritos del usuario.
+      operationId: removeFavoriteBoard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      responses:
+        "200":
+          description: Tablero removido de favoritos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                    example: "Tablero eliminado de favoritos"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/updateBoard/{board_id}:
+    put:
+      tags:
+        - Tableros
+      summary: Actualizar tablero
+      description: Actualiza la información de un tablero existente.
+      operationId: updateBoard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Proyecto Frontend Actualizado"
+                description:
+                  type: string
+                  nullable: true
+                  example: "Nueva descripción del tablero"
+                image:
+                  type: string
+                  nullable: true
+                  description: Imagen en formato base64
+                isPublic:
+                  type: boolean
+                  example: true
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: ["desarrollo", "frontend", "react"]
+      responses:
+        "200":
+          description: Tablero actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tablero actualizado correctamente"
+                  board:
+                    $ref: "#/components/schemas/Board"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/deleteBoard/{board_id}:
+    delete:
+      tags:
+        - Tableros
+      summary: Eliminar tablero
+      description: Elimina un tablero permanentemente. Solo el propietario puede eliminarlo.
+      operationId: deleteBoard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      responses:
+        "200":
+          description: Tablero eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tablero eliminado correctamente"
+        "403":
+          description: Sin permisos para eliminar el tablero
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/users/search:
+    get:
+      tags:
+        - Tableros
+      summary: Buscar usuarios
+      description: Busca usuarios por nombre o email para agregarlos a tableros.
+      operationId: searchUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+          description: Término de búsqueda (mínimo 2 caracteres)
+      responses:
+        "200":
+          description: Búsqueda realizada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "400":
+          description: Parámetro de búsqueda inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /board/removeMember:
+    delete:
+      tags:
+        - Tableros
+      summary: Remover miembro de tablero
+      description: Remueve un miembro de un tablero.
+      operationId: removeMemberFromBoard
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - boardId
+                - userId
+              properties:
+                boardId:
+                  type: integer
+                  example: 1
+                  description: ID del tablero
+                userId:
+                  type: integer
+                  example: 123
+                  description: ID del usuario a remover
+      responses:
+        "200":
+          description: Miembro removido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Miembro eliminado del tablero correctamente"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tablero o usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============ TARJETAS ============
+  /card/createCard:
+    post:
+      tags:
+        - Tarjetas
+      summary: Crear nueva tarjeta
+      description: Crea una nueva tarjeta en un tablero específico.
+      operationId: createCard
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - boardId
+              properties:
+                title:
+                  type: string
+                  example: "Implementar login"
+                  description: Título de la tarjeta
+                description:
+                  type: string
+                  nullable: true
+                  example: "Desarrollar la funcionalidad de autenticación"
+                  description: Descripción detallada de la tarjeta
+                boardId:
+                  type: integer
+                  example: 1
+                  description: ID del tablero donde crear la tarjeta
+                responsableId:
+                  type: integer
+                  nullable: true
+                  example: 123
+                  description: ID del usuario responsable
+                beginDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: "2024-01-15T09:00:00"
+                  description: Fecha de inicio
+                dueDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: "2024-01-20T17:00:00"
+                  description: Fecha de vencimiento
+                state:
+                  type: string
+                  enum: [TODO, IN_PROGRESS, DONE]
+                  default: TODO
+                  example: "TODO"
+                  description: Estado de la tarjeta
+      responses:
+        "201":
+          description: Tarjeta creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tarjeta creada correctamente"
+                  card:
+                    $ref: "#/components/schemas/Card"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/getCards/{board_id}:
+    get:
+      tags:
+        - Tarjetas
+      summary: Obtener tarjetas de un tablero
+      description: Retorna todas las tarjetas de un tablero específico.
+      operationId: getAllCards
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: board_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del tablero
+      responses:
+        "200":
+          description: Lista de tarjetas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Card"
+        "404":
+          description: Tablero no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/getCard/{card_id}:
+    get:
+      tags:
+        - Tarjetas
+      summary: Obtener tarjeta por ID
+      description: Retorna la información detallada de una tarjeta específica.
+      operationId: getCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      responses:
+        "200":
+          description: Tarjeta obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "404":
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/updateCard/{card_id}:
+    put:
+      tags:
+        - Tarjetas
+      summary: Actualizar tarjeta
+      description: Actualiza la información de una tarjeta existente.
+      operationId: updateCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Implementar login actualizado"
+                description:
+                  type: string
+                  nullable: true
+                  example: "Nueva descripción de la funcionalidad"
+                responsableId:
+                  type: integer
+                  nullable: true
+                  example: 456
+                beginDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: "2024-01-16T10:00:00"
+                dueDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: "2024-01-25T18:00:00"
+                state:
+                  type: string
+                  enum: [TODO, IN_PROGRESS, DONE]
+                  example: "IN_PROGRESS"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: ["urgente", "backend"]
+      responses:
+        "200":
+          description: Tarjeta actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tarjeta actualizada correctamente"
+                  card:
+                    $ref: "#/components/schemas/Card"
+        "404":
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/deleteCard/{card_id}:
+    delete:
+      tags:
+        - Tarjetas
+      summary: Eliminar tarjeta
+      description: Elimina una tarjeta permanentemente.
+      operationId: deleteCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      responses:
+        "200":
+          description: Tarjeta eliminada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Tarjeta eliminada correctamente"
+        "404":
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/addMembers/{card_id}:
+    post:
+      tags:
+        - Tarjetas
+      summary: Agregar miembro a tarjeta
+      description: Agrega un miembro a una tarjeta específica.
+      operationId: addMemberToCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                  description: ID del usuario a agregar
+      responses:
+        "200":
+          description: Miembro agregado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Message:
+                    type: string
+                    example: "Miembro agregado correctamente"
+        "400":
+          description: Usuario ya es miembro o datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tarjeta o usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/removeMember/{card_id}:
+    delete:
+      tags:
+        - Tarjetas
+      summary: Remover miembro de tarjeta
+      description: Remueve un miembro de una tarjeta específica.
+      operationId: removeMemberFromCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: integer
+                  example: 123
+                  description: ID del usuario a remover
+      responses:
+        "200":
+          description: Miembro removido exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Miembro eliminado correctamente"
+        "400":
+          description: Usuario no es miembro o datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tarjeta o usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /card/getMembers/{card_id}:
+    get:
+      tags:
+        - Tarjetas
+      summary: Obtener miembros de tarjeta
+      description: Retorna la lista de miembros asignados a una tarjeta.
+      operationId: getCardMembers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+      responses:
+        "200":
+          description: Lista de miembros obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "404":
+          description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============ ETIQUETAS ============
+  /tag:
+    get:
+      tags:
+        - Etiquetas
+      summary: Obtener todas las etiquetas
+      description: Retorna una lista de todas las etiquetas disponibles en el sistema.
+      operationId: getAllTags
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de etiquetas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                    example: 5
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tag"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Etiquetas
+      summary: Crear nueva etiqueta
+      description: Crea una nueva etiqueta en el sistema.
+      operationId: createTag
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "urgente"
+                  description: Nombre de la etiqueta
+      responses:
+        "201":
+          description: Etiqueta creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tag:
+                    $ref: "#/components/schemas/Tag"
+                  created:
+                    type: boolean
+                    example: true
+        "200":
+          description: Etiqueta ya existe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tag:
+                    $ref: "#/components/schemas/Tag"
+                  created:
+                    type: boolean
+                    example: false
+        "400":
+          description: Nombre requerido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tag/getTags:
+    get:
+      tags:
+        - Etiquetas
+      summary: Obtener todas las etiquetas (alternativo)
+      description: Endpoint alternativo para obtener todas las etiquetas.
+      operationId: getTagsAlt
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de etiquetas obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  total:
+                    type: integer
+                    example: 5
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tag"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tag/by-name/{name}:
+    get:
+      tags:
+        - Etiquetas
+      summary: Buscar etiqueta por nombre
+      description: Busca una etiqueta específica por su nombre.
+      operationId: getTagByName
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nombre de la etiqueta
+      responses:
+        "200":
+          description: Etiqueta encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tag:
+                    $ref: "#/components/schemas/Tag"
+        "404":
+          description: Etiqueta no encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Etiqueta no encontrada"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tag/{tag_id}:
+    put:
+      tags:
+        - Etiquetas
+      summary: Actualizar etiqueta
+      description: Actualiza el nombre de una etiqueta existente.
+      operationId: updateTag
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tag_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la etiqueta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "muy urgente"
+                  description: Nuevo nombre de la etiqueta
+      responses:
+        "200":
+          description: Etiqueta actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  tag:
+                    $ref: "#/components/schemas/Tag"
+        "400":
+          description: Nombre requerido o ya existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Etiqueta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============ MENSAJES ============
   /message:
     get:
       tags:
         - Mensajes
       summary: Obtener todos los mensajes
       description: |
-        Devuelve una lista de todos los mensajes en el sistema.
+        Retorna una lista de todos los mensajes en el sistema.
         **Nota**: Este es un endpoint de ejemplo/prueba.
       operationId: getAllMessages
       responses:
@@ -408,7 +1659,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-# ==================== COMPONENTES ====================
 components:
   securitySchemes:
     BearerAuth:
@@ -427,7 +1677,6 @@ components:
         Incluir en el header como: `Authorization: Bearer {refresh_token}`
 
   schemas:
-    # ==================== MODELOS PRINCIPALES ====================
     User:
       type: object
       description: Modelo de usuario del sistema
@@ -453,7 +1702,7 @@ components:
           type: string
           format: uri
           nullable: true
-          example: "https://bucket.s3.amazonaws.com/profiles/juan.jpg"
+          example: "https://trainit404.s3.amazonaws.com/perfil_123.png"
           description: URL de la imagen de perfil almacenada en Amazon S3
       required:
         - id
@@ -482,7 +1731,7 @@ components:
           type: string
           format: uri
           nullable: true
-          example: "https://bucket.s3.amazonaws.com/boards/proyecto-web.jpg"
+          example: "https://trainit404.s3.amazonaws.com/board_123.png"
           description: URL de la imagen del tablero
         creationDate:
           type: string
@@ -514,6 +1763,71 @@ components:
         - userId
         - isPublic
 
+    Card:
+      type: object
+      description: Modelo de tarjeta dentro de un tablero
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único de la tarjeta
+        title:
+          type: string
+          example: "Implementar autenticación"
+          description: Título de la tarjeta
+        description:
+          type: string
+          nullable: true
+          example: "Desarrollar sistema de login y registro de usuarios"
+          description: Descripción detallada de la tarjeta
+        responsableId:
+          type: integer
+          nullable: true
+          example: 123
+          description: ID del usuario responsable de la tarjeta
+        creationDate:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+          description: Fecha de creación de la tarjeta
+        beginDate:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-16T09:00:00Z"
+          description: Fecha de inicio de la tarjeta
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-25T17:00:00Z"
+          description: Fecha de vencimiento de la tarjeta
+        state:
+          type: string
+          enum: [TODO, IN_PROGRESS, DONE]
+          example: "TODO"
+          description: Estado actual de la tarjeta
+        boardId:
+          type: integer
+          example: 1
+          description: ID del tablero al que pertenece la tarjeta
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+          description: Lista de miembros asignados a la tarjeta
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+          description: Lista de etiquetas asociadas a la tarjeta
+      required:
+        - id
+        - title
+        - creationDate
+        - state
+        - boardId
+
     Tag:
       type: object
       description: Modelo de etiqueta para categorización
@@ -524,7 +1838,7 @@ components:
           description: ID único de la etiqueta
         name:
           type: string
-          example: "Urgente"
+          example: "urgente"
           description: Nombre de la etiqueta
       required:
         - id
@@ -546,7 +1860,6 @@ components:
         - id
         - content
 
-    # ==================== MODELOS DE RESPUESTA ====================
     ErrorResponse:
       type: object
       description: Formato estándar para respuestas de error
@@ -581,11 +1894,11 @@ components:
           $ref: "#/components/schemas/User"
         access_token:
           type: string
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
           description: Token JWT para autorización
         refresh_token:
           type: string
-          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          example: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
           description: Token para renovar el access_token
         token_type:
           type: string
@@ -598,7 +1911,6 @@ components:
         - refresh_token
         - token_type
 
-# ==================== TAGS ====================
 tags:
   - name: Autenticación
     description: |
@@ -614,12 +1926,45 @@ tags:
       - **Access Token**: Incluir en header `Authorization: Bearer {token}` para endpoints protegidos
       - **Refresh Token**: Usar en endpoint /auth/refresh para obtener nuevo access token
 
+  - name: Tableros
+    description: |
+      Endpoints para gestión completa de tableros colaborativos.
+
+      ### Funcionalidades principales:
+      - Crear, leer, actualizar y eliminar tableros
+      - Gestión de miembros (agregar/remover usuarios)
+      - Sistema de favoritos
+      - Búsqueda de usuarios
+      - Control de privacidad (público/privado)
+      - Asociación con etiquetas
+
+  - name: Tarjetas
+    description: |
+      Endpoints para gestión de tarjetas dentro de los tableros.
+
+      ### Características:
+      - Crear, leer, actualizar y eliminar tarjetas
+      - Asignación de responsables
+      - Gestión de miembros por tarjeta
+      - Estados: TODO, IN_PROGRESS, DONE
+      - Fechas de inicio y vencimiento
+      - Asociación con etiquetas
+
+  - name: Etiquetas
+    description: |
+      Sistema de etiquetas para categorización y organización.
+
+      ### Funcionalidades:
+      - Crear y actualizar etiquetas
+      - Búsqueda por nombre
+      - Listado completo de etiquetas disponibles
+      - Asociación con tableros y tarjetas
+
   - name: Mensajes
     description: |
       Endpoints para gestión de mensajes básicos.
       **Nota**: Estos son endpoints de ejemplo/prueba para validar la funcionalidad básica de la API.
 
-# ==================== INFORMACIÓN ADICIONAL ====================
 externalDocs:
   description: Repositorio del proyecto en GitHub
   url: https://github.com/Programa-TrainIT-Ar/be-trelloop-grupo-1

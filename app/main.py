@@ -4,10 +4,11 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
-from .models import Message, User, Board, Tag
+from .models import Message, User, Board, Tag, Card
 from .auth import auth_bp
 from .board import board_bp
 from .tag import tag_bp
+from .card import card_bp
 from datetime import timedelta
 import os
 
@@ -47,6 +48,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(board_bp, url_prefix="/board")
 app.register_blueprint(tag_bp, url_prefix="/tag")
+app.register_blueprint(card_bp, url_prefix="/card")
 
 
 @app.before_request
@@ -68,9 +70,5 @@ def get_messages():
      return jsonify([{"id": m.id, "content": m.content} for m in msgs])
 
 
-
-
 if __name__ == "__main__":
-     with app.app_context():
-          db.create_all()
-     app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
