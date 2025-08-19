@@ -297,6 +297,17 @@ def update_board(board_id):
             return jsonify({"Warning":"Tablero no encontrado"}),404
         if board.user_id != user.id:
             return jsonify({"Warning":"No tienes permiso para actualizar este tablero"}),403
+        
+        print(f"DEBUG: board.user_id = {board.user_id} (tipo: {type(board.user_id)})")
+        print(f"DEBUG: user.id = {user.id} (tipo: {type(user.id)})")
+        print(f"DEBUG: Comparación board.user_id != user.id: {board.user_id != user.id}")
+        
+        if board.user_id != user.id:
+            print(f"DEBUG: ACCESO DENEGADO - Los IDs no coinciden")
+            return jsonify({"Warning": "No tienes permiso para actualizar este tablero"}), 403
+
+
+
           # Recibir datos del formulario
         name = request.form.get("name")
         description = request.form.get("description", "")
@@ -316,6 +327,23 @@ def update_board(board_id):
             except Exception as e:
                 return jsonify({"error": "Error uploading image", "details": str(e)}), 500
         
+         # PROCESAR ETIQUETAS 
+        tag_names = request.form.getlist("tags")  # Obtener lista de etiquetas
+        
+        # Limpiar etiquetas existentes del tablero
+        board.tags.clear()
+        
+        # Agregar nuevas etiquetas
+        for tag_name in tag_names:
+            if tag_name.strip():
+                # Buscar si la etiqueta ya existe
+                tag = Tag.query.filter_by(name=tag_name.strip()).first()
+                if not tag:
+                    # Crear nueva etiqueta si no existe
+                    tag = Tag(name=tag_name.strip())
+                    db.session.add(tag)
+                board.tags.append(tag)
+
         board.name = name
         board.description = description
         board.is_public = is_public
@@ -336,10 +364,6 @@ def delete_board(board_id):
     """
     try:
         current_user_id = get_jwt_identity()
-        user=User.query.get(current_user_id)
-        if not user:
-            return jsonify({"error": "Usuario no encontrado"}), 404
-        
         board = Board.query.get(board_id)
 
         # 1. Verificar si el tablero existe
@@ -347,7 +371,7 @@ def delete_board(board_id):
             return jsonify({"error": "Tablero no encontrado"}), 404
 
         # 2. Verificar si el usuario actual es el propietario del tablero
-        if board.user_id != user.id:
+        if board.user_id != int(current_user_id):
             return jsonify({"error": "No tienes permiso para eliminar este tablero"}), 403
 
         # Nota: Sería ideal eliminar la imagen asociada de S3 aquí para no dejar archivos huérfanos.
@@ -377,7 +401,7 @@ def search_users():
                 "message": "Ingrese al menos 2 caracteres para buscar"
             }), 200
 
-        #Buscar por nombre, apellido o email
+        # Buscar por nombre, apellido o email
         users = User.query.filter(
             db.or_(
                 User.first_name.ilike(f"%{query}%"),
@@ -386,6 +410,7 @@ def search_users():
             )
         ).limit(10).all()
 
+        # Serializar resultados
         users_serialized = [{
             "id": user.id,
             "first_name": user.first_name,
@@ -405,3 +430,53 @@ def search_users():
             "error": "Error al buscar usuarios",
             "details": str(e)
         }), 500
+
+
+# ELIMINAR MIEMBRO DE UN TABLERO-------------------------------------------------------------------------------------------------------
+@board_bp.route("/removeMember", methods=["DELETE"])
+@jwt_required()
+def remove_member_from_board():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        data = request.get_json()
+        board_id = data.get("boardId")
+        user_id = data.get("userId")
+
+        if not board_id or not user_id:
+            return jsonify({"error": "boardId y userId son requeridos"}), 400
+
+        board = Board.query.get(board_id)
+        if not board:
+            return jsonify({"error": "Tablero no encontrado"}), 404
+        
+        print(f"DEBUG: board.user_id = {board.user_id} (tipo: {type(board.user_id)})")
+        print(f"DEBUG: Comparación: {board.user_id} != {int(current_user_id)} = {board.user_id != int(current_user_id)}")
+
+
+        # Verificar que el usuario actual sea el propietario del tablero
+        if board.user_id != int(current_user_id):
+            return jsonify({"error": "No tienes permiso para eliminar miembros de este tablero"}), 403
+
+        user_to_remove = User.query.get(user_id)
+        if not user_to_remove:
+            return jsonify({"error": "Usuario a eliminar no encontrado"}), 404
+
+        if user_to_remove not in board.members:
+            return jsonify({"error": "El usuario no es miembro de este tablero"}), 400
+
+        # No permitir que el propietario se elimine a sí mismo
+        if int(user_id) == int(current_user_id):
+            return jsonify({"error": "El propietario del tablero no puede eliminarse a sí mismo"}), 400
+
+        board.members.remove(user_to_remove)
+        db.session.commit()
+
+        return jsonify({"message": "Miembro eliminado correctamente"}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": str(error)}), 500
