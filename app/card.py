@@ -3,6 +3,9 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
 from .models import db, Board, Card, State, User
+from .services.notifications import create_notification
+from .services.pusher_client import get_pusher_client
+import uuid
 
 
 card_bp = Blueprint("card", __name__)
@@ -52,12 +55,34 @@ def create_card():
         db.session.add(new_card)
         db.session.commit()
 
+        # Si se asignó un responsable, crear notificación para esa persona
+        if responsable_id:
+            try:
+                event_id = f"card:{new_card.id}:assigned:{responsable_id}"
+                assignee = User.query.get(responsable_id)
+                if assignee:
+                    create_notification(
+                        db.session,
+                        user_id=str(assignee.id),
+                        type_="CARD_ASSIGNED",
+                        title="Te asignaron una tarjeta",
+                        message=f"Has sido asignado a la tarjeta '{new_card.title}' en el tablero '{board.name}'.",
+                        resource_kind="card",
+                        resource_id=str(new_card.id),
+                        actor_id=str(user_id),
+                        event_id=event_id,
+                        user_email=assignee.email,
+                        send_email_also=True
+                    )
+            except Exception as notif_err:
+                print(f"[Notification Error] {notif_err}")
+
         return jsonify({"message": "Tarjeta creada correctamente", "card": new_card.serialize()}), 201
 
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-
+    
 # MOSTRAR TARJETAS DE UN TABLERO (TODOS)-------------------------------------------------------------------------------------------------------
 @card_bp.route("/getCards/<int:board_id>", methods=["GET"])
 @jwt_required()
@@ -98,7 +123,27 @@ def update_card(card_id):
         card.responsable_id = data.get("responsableId", card.responsable_id)
         card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
         card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
-        card.state = data.get("state", card.state)
+        
+        # ARREGLAR: Convertir string a Enum State
+        state_value = data.get("state")
+        if state_value:
+            if state_value == "TODO":
+                card.state = State.TODO
+            elif state_value == "IN_PROGRESS":
+                card.state = State.IN_PROGRESS
+            elif state_value == "DONE":
+                card.state = State.DONE
+
+        # Manejar etiquetas
+        if 'tags' in data:
+            card.tags.clear()
+            for tag_name in data['tags']:
+                if tag_name.strip():
+                    tag = Tag.query.filter_by(name=tag_name.strip()).first()
+                    if not tag:
+                        tag = Tag(name=tag_name.strip())
+                        db.session.add(tag)
+                    card.tags.append(tag)
 
         db.session.commit()
         return jsonify({"message": "Tarjeta actualizada correctamente", "card": card.serialize()}), 200
@@ -106,6 +151,7 @@ def update_card(card_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
+
 
 # ELIMINAR UNA TARJETA---------------------------------------------------------------------------------------------------------------
 @card_bp.route("/deleteCard/<int:card_id>", methods=["DELETE"])
@@ -154,15 +200,68 @@ def add_memember(card_id):
         
         card.members.append(user_to_add)
         db.session.commit()
-        return jsonify({"Message":"Miembro agregado correctamente"}),200   
-      
+
+        # Crear notificación para el usuario agregado a la tarjeta
+        try:
+            event_id = f"card:{card_id}:member_added:{user_to_add.id}"
+            create_notification(
+                db.session,
+                user_id=str(user_to_add.id),
+                type_="CARD_ASSIGNED",
+                title="Te agregaron a una tarjeta",
+                message=f"{user.first_name} {user.last_name} te agregó a la tarjeta '{card.title}' en el tablero '{card.board.name}'.",
+                resource_kind="card",
+                resource_id=str(card.id),
+                actor_id=str(user.id),
+                event_id=event_id,
+                user_email=user_to_add.email,
+                send_email_also=True
+            )
+        except Exception as notif_err:
+            print(f"[Notification Error] {notif_err}")
+
+        return jsonify({"Message": "Miembro agregado correctamente"}), 200
+
     except Exception as error:
         db.session.rollback()
-        return jsonify({"Warning":str(error)}),500
+        return jsonify({"Warning": str(error)}), 500
  
-# ELIMINAR MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
+# ELIMINAR MIEMBROS DE UNA TARJETA -----------------------------------------------------------
+@card_bp.route("/removeMember/<int:card_id>", methods=["DELETE"])
+@jwt_required()
+def remove_member_from_card(card_id):
+    try:
+        current_user_id = get_jwt_identity()
+        requester = User.query.get(current_user_id)
+        if not requester:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        data = request.get_json() or {}
+        user_id = data.get("userId")
+        if not user_id:
+            return jsonify({"error": "Falta 'userId' en el cuerpo"}), 400
+
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        user_to_remove = User.query.get(user_id)
+        if not user_to_remove:
+            return jsonify({"error": "Usuario a eliminar no encontrado"}), 404
+
+        if user_to_remove not in card.members:
+            return jsonify({"error": "El usuario no es miembro de esta tarjeta"}), 400
+
+        card.members.remove(user_to_remove)
+        db.session.commit()
+        return jsonify({"message": "Miembro eliminado correctamente"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 # OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
-@card_bp.route("getMembers/<int:card_id>", methods=['GET'])
+@card_bp.route("/getMembers/<int:card_id>", methods=['GET'])
 @jwt_required()
 def get_members(card_id):
     try:
@@ -172,4 +271,69 @@ def get_members(card_id):
         members=[member.serialize() for member in card.members]
         return jsonify(members),200
     except Exception as error:
-        return jsonify({"Warning":str(error)}),500
+        return jsonify({"Warning":str(error)}),500 
+    
+# Endpoint solo para pruebas locales, se debe elimnar--------------------------------
+@card_bp.route("/debug/trigger_notification", methods=["POST"])
+@jwt_required()
+def debug_trigger_notification():
+    """Endpoint de ayuda: dispara una notificación manual para probar Pusher"""
+    try:
+        data = request.get_json() or {}
+        target_user = data.get("userId")
+        if not target_user:
+            return jsonify({"error": "userId requerido en body"}), 400
+
+        payload = {
+            "id": "debug-" + (str(uuid.uuid4())[:8]),
+            "type": "DEBUG",
+            "title": "Notificación de prueba",
+            "message": "Este es un test lanzado manualmente",
+            "resource": None,
+            "actorId": get_jwt_identity(),
+            "read": False,
+            "createdAt": datetime.utcnow().isoformat() + "Z",
+        }
+
+        from .services.pusher_client import trigger_user_notification
+        trigger_user_notification(str(target_user), payload, private=True)
+        return jsonify({"ok": True, "sent_to": target_user}), 200
+    except Exception as e:
+        current_app.logger.exception("Error debug trigger")
+        return jsonify({"error": str(e)}), 500
+
+    
+# Endpoint de autenticación Pusher (canales privados) ----------------------------
+@card_bp.route("/pusher/auth", methods=["POST"])
+@jwt_required()
+def pusher_auth():
+    """
+    Endpoint que Pusher JS llama para autenticar canales privados.
+    Se espera form-data (o JSON) con 'channel_name' y 'socket_id'.
+    Requerimos JWT para validar que el usuario está autenticado y sólo
+    pueda autenticarse en su propio canal 'private-user-<user_id>'.
+    """
+    try:
+        # extraer datos (soportamos form-data y JSON)
+        data_json = request.get_json(silent=True) or {}
+        channel_name = request.form.get("channel_name") or data_json.get("channel_name")
+        socket_id = request.form.get("socket_id") or data_json.get("socket_id")
+
+        if not channel_name or not socket_id:
+            return jsonify({"error": "channel_name and socket_id are required"}), 400
+
+        # verificar que el canal corresponde al usuario autenticado
+        user_id = get_jwt_identity()
+        expected_channel = f"private-user-{user_id}"
+        if channel_name != expected_channel:
+            return jsonify({"error": "forbidden - channel mismatch"}), 403
+
+        # generar la firma usando el cliente pusher (usa las credenciales PUSHER_* en el env)
+        pusher_client = get_pusher_client()
+        auth = pusher_client.authenticate(channel=channel_name, socket_id=socket_id)
+
+        return jsonify(auth)
+
+    except Exception as e:
+        current_app.logger.exception("Pusher auth failed")
+        return jsonify({"error": "authentication failed"}), 500

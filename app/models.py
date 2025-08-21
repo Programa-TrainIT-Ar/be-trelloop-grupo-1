@@ -26,6 +26,14 @@ favorite_boards = db.Table('favorite_boards',
     db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True)
 )
 
+# Agregar esta tabla card y etiquetas para la relación muchos a muchos entre tarjetas y etiquetas:
+card_tag_association = db.Table('card_tag_association',
+    db.Column('card_id', db.Integer, db.ForeignKey('cards.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
+)
+
+
+
 class Message(db.Model):
      id = db.Column(db.Integer, primary_key=True)
      content = db.Column(db.String(255), nullable=False)
@@ -79,7 +87,7 @@ class Board(db.Model):
     tags = db.relationship('Tag', secondary='board_tag_association', back_populates='boards')
     is_public = db.Column(db.Boolean, default=False) # Indica si el tablero es público o privado, por defecto será privado.
 
-    cards = db.relationship('Card', back_populates='board')
+    cards = db.relationship("Card", backref="board", cascade="all, delete-orphan")
    
 
 
@@ -124,9 +132,11 @@ class Card(db.Model):
     begin_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
-    board_id = db.Column(db.Integer, db.ForeignKey('boards.id'), nullable=False)
+    board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
+    tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
 
-    board = db.relationship('Board', back_populates='cards')
+
+   
     members = db.relationship('User', secondary='card_user_association', backref='cards')
 
     def serialize(self):
@@ -140,5 +150,53 @@ class Card(db.Model):
             "dueDate": self.due_date.isoformat() if self.due_date else None,
             "state": self.state.value,
             "boardId": self.board_id,
+            "tags":[tag.name for tag in self.tags],
             "members": [member.serialize() for member in self.members]
+        }
+    
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)  
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Tipo y contenido
+    type = db.Column(db.String(50), nullable=False)        
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+
+    # Recurso relacionado (opcional)
+    resource_kind = db.Column(db.String(20), nullable=True)  
+    resource_id = db.Column(db.Integer, nullable=True)
+
+    # Actor que originó el evento (opcional)
+    actor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    # Estado y tiempo
+    read = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+    # Idempotencia (opcional pero útil)
+    event_id = db.Column(db.String(100), unique=True, nullable=True)
+
+    # Índices para consultas típicas
+    __table_args__ = (
+        db.Index("idx_notifications_user_read_created", "user_id", "read", "created_at"),
+    )
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "userId": self.user_id,
+            "type": self.type,
+            "title": self.title,
+            "message": self.message,
+            "resource": (
+                {"kind": self.resource_kind, "id": self.resource_id}
+                if self.resource_kind and self.resource_id is not None else None
+            ),
+            "actorId": self.actor_id,
+            "read": self.read,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "eventId": self.event_id,
         }
