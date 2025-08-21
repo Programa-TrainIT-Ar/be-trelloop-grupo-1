@@ -2,6 +2,7 @@
 import os
 import pusher
 from flask import current_app
+from ..config import PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER
 
 _pusher = None
 

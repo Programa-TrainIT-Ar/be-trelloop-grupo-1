@@ -11,9 +11,11 @@ JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "604800")
 # Configuración de CORS
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174").split(",")
 
-# Configuración de Resend
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-RESEND_FROM = os.getenv("RESEND_FROM")
+# Configuración de Pusher
+PUSHER_APP_ID = os.getenv("PUSHER_APP_ID")
+PUSHER_KEY = os.getenv("PUSHER_KEY")
+PUSHER_SECRET = os.getenv("PUSHER_SECRET")
+PUSHER_CLUSTER = os.getenv("PUSHER_CLUSTER")
 
 # Configuración de la aplicación
 DEBUG = os.getenv("DEBUG", "True").lower() in ["true", "1", "yes"]

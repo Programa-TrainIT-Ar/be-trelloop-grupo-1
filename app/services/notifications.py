@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from ..models import Notification
 from .pusher_client import trigger_user_notification
-from .email import send_email
 from flask import current_app
 
 FRONTEND_BASE = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
@@ -61,8 +60,6 @@ def create_notification(
         event_id=event_id,
     )
     db.add(notif)
-    db.commit()
-    db.refresh(notif)
 
     payload = build_notification_payload(notif)
 
@@ -73,27 +70,28 @@ def create_notification(
     except Exception as e:
         current_app.logger.exception(f"[notifications] Pusher trigger failed for user={user_id}: {e}")
 
+    #-------------------------COMENTADO PARA IMPLEMENTAR LUEGO LAS NOTFICACIONES POR EMAIL----------------------------------
     # Email (opcional) — capturar errores para no romper el flujo
-    if send_email_also and user_email:
-        try:
-            subject = title
-            cta = ""
-            if resource_kind == "board" and resource_id:
-                cta = f'<p><a href="{FRONTEND_BASE}/board/{resource_id}">Abrir tablero</a></p>'
-            elif resource_kind == "card" and resource_id:
-                cta = f'<p><a href="{FRONTEND_BASE}/board/cards/{resource_id}">Abrir tarjeta</a></p>'
+    # if send_email_also and user_email:
+    #     try:
+    #         subject = title
+    #         cta = ""
+    #         if resource_kind == "board" and resource_id:
+    #             cta = f'<p><a href="{FRONTEND_BASE}/board/{resource_id}">Abrir tablero</a></p>'
+    #         elif resource_kind == "card" and resource_id:
+    #             cta = f'<p><a href="{FRONTEND_BASE}/board/cards/{resource_id}">Abrir tarjeta</a></p>'
 
-            html = f"""
-            <div style="font-family:Arial,sans-serif">
-              <h3>{title}</h3>
-              <p>{message}</p>
-              {cta}
-              <p style="color:#888;font-size:12px">Enviado por TrainIT</p>
-            </div>
-            """
-            current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject}")
-            send_email(user_email, subject, html)
-        except Exception as e:
-            current_app.logger.exception(f"[notifications] Error sending email to {user_email}: {e}")
+    #         html = f"""
+    #         <div style="font-family:Arial,sans-serif">
+    #           <h3>{title}</h3>
+    #           <p>{message}</p>
+    #           {cta}
+    #           <p style="color:#888;font-size:12px">Enviado por TrainIT</p>
+    #         </div>
+    #         """
+    #         current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject}")
+    #         send_email(user_email, subject, html)
+    #     except Exception as e:
+    #         current_app.logger.exception(f"[notifications] Error sending email to {user_email}: {e}")
 
     return notif

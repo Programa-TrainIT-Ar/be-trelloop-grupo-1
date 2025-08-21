@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
-from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES, RESEND_API_KEY, RESEND_FROM
+from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
 from .models import Message, User, Board, Tag, Card
 from .auth import auth_bp
@@ -10,9 +10,10 @@ from .board import board_bp
 from .tag import tag_bp
 from .card import card_bp
 from .realtime import realtime_bp
+from .services.notifications import create_notification
 from datetime import timedelta
 import os
-from .services.email import send_email
+
 
 app = Flask(__name__)
 
@@ -35,10 +36,6 @@ app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 jwt = JWTManager(app)
 
-# Configuración de Resend
-app.config["RESEND_API_KEY"] = RESEND_API_KEY
-app.config["RESEND_FROM"] = RESEND_FROM
-
 # Callback para cargar el usuario desde el token JWT
 @jwt.user_lookup_loader
 def user_lookup_callback(_jwt_header, jwt_data):
@@ -56,23 +53,31 @@ app.register_blueprint(tag_bp, url_prefix="/tag")
 app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
 
-#prueba resend----------------------------------------------------
-@app.route("/test-email", methods=["POST"])
-def test_email():
-    data = request.json
-    to = data.get("to")
-    subject = data.get("subject", "Test desde Flask + Resend")
-    html = "<h1>Hola!</h1><p>Esto es un test de Resend desde Flask 🚀</p>"
-
-    ok = send_email(to, subject, html)
-    return jsonify({"success": ok}), 200 if ok else 500
-#--------------------------------------------------------------------
-
 
 @app.before_request
 def handle_options_request():
     if request.method == 'OPTIONS':
         return '', 204
+
+
+#PRUEBA PUSHER----------------------------------------------------------------------------------------------------------
+from .database import db
+
+@app.route("/test-notif", methods=["POST"])
+def test_notification():
+    data = request.json
+    with db.session.begin():  # abre un contexto de sesión
+        notif = create_notification(
+            db.session,  # <-- PASA la sesión, no db directamente
+            user_id=data.get("user_id", 1),
+            type_="test",
+            title=data.get("title", "Notificación de prueba"),
+            message=data.get("message", "Esto es un test"),
+            send_email_also=False
+        )
+    return {"status": "ok", "notif_id": notif.id}
+
+#---------------------------------------------------------------------------------------------------------------------------------
 
 @app.route("/message", methods=["POST"])
 def post_message():

@@ -8,7 +8,7 @@ import uuid
 import boto3
 import base64
 from sqlalchemy import or_
-from .services.notifications import create_notification
+# from .services.notifications import create_notification
 
 board_bp = Blueprint("board", __name__)
 CORS(board_bp)
