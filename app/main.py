@@ -9,6 +9,7 @@ from .auth import auth_bp
 from .board import board_bp
 from .tag import tag_bp
 from .card import card_bp
+from .realtime import realtime_bp
 from datetime import timedelta
 import os
 
@@ -49,6 +50,7 @@ app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(board_bp, url_prefix="/board")
 app.register_blueprint(tag_bp, url_prefix="/tag")
 app.register_blueprint(card_bp, url_prefix="/card")
+app.register_blueprint(realtime_bp, url_prefix="/realtime")
 
 
 @app.before_request
