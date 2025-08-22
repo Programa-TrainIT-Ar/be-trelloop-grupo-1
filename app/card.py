@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State, User
+from .models import db, Board, Card, User
 from .services.notifications import create_notification
 from .services.pusher_client import get_pusher_client
 import uuid
@@ -127,12 +127,8 @@ def update_card(card_id):
         # ARREGLAR: Convertir string a Enum State
         state_value = data.get("state")
         if state_value:
-            if state_value == "TODO":
-                card.state = State.TODO
-            elif state_value == "IN_PROGRESS":
-                card.state = State.IN_PROGRESS
-            elif state_value == "DONE":
-                card.state = State.DONE
+            card.state = state_value
+            
 
         # Manejar etiquetas
         if 'tags' in data:

@@ -117,10 +117,10 @@ class Tag(db.Model):
             "name": self.name
         }
 
-class State(enum.Enum):
-    TODO = "To Do"
-    IN_PROGRESS = "In Progress"
-    DONE = "Done"
+# class State(enum.Enum):
+#     TODO = "To Do"
+#     IN_PROGRESS = "In Progress"
+#     DONE = "Done"
 
 class Card(db.Model):
     __tablename__="cards"
@@ -131,7 +131,7 @@ class Card(db.Model):
     creation_date = db.Column(db.DateTime, nullable=False)
     begin_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
-    state = db.Column(db.Enum(State), nullable=False, default=State.TODO) 
+    state = db.Column(db.String(255), nullable=False, default='To Do') 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
 
@@ -148,7 +148,7 @@ class Card(db.Model):
             "creationDate": self.creation_date.isoformat(),
             "beginDate": self.begin_date.isoformat() if self.begin_date else None,
             "dueDate": self.due_date.isoformat() if self.due_date else None,
-            "state": self.state.value,
+            "state": self.state,
             "boardId": self.board_id,
             "tags":[tag.name for tag in self.tags],
             "members": [member.serialize() for member in self.members]
