@@ -10,6 +10,7 @@ from .board import board_bp
 from .tag import tag_bp
 from .card import card_bp
 from .realtime import realtime_bp
+from .services.notifications import create_notification
 from datetime import timedelta
 import os
 
@@ -57,6 +58,25 @@ app.register_blueprint(realtime_bp, url_prefix="/realtime")
 def handle_options_request():
     if request.method == 'OPTIONS':
         return '', 204
+
+#PRUEBA PUSHER----------------------------------------------------------------------------------------------------------
+from .database import db
+
+@app.route("/test-notif", methods=["POST"])
+def test_notification():
+    data = request.json
+    with db.session.begin():  # abre un contexto de sesión
+        notif = create_notification(
+            db.session,  # <-- PASA la sesión, no db directamente
+            user_id=data.get("userid", 1),
+            type_="test",
+            title=data.get("title", "Notificación de prueba"),
+            message=data.get("message", "Esto es un test"),
+            send_email_also=False
+        )
+    return {"status": "ok", "notif_id": notif.id}
+
+#---------------------------------------------------------------------------------------------------------------------------------
 
 @app.route("/message", methods=["POST"])
 def post_message():

@@ -61,8 +61,8 @@ def create_notification(
         event_id=event_id,
     )
     db.add(notif)
-    db.commit()
-    db.refresh(notif)
+    # db.commit()
+    # db.refresh(notif)
 
     payload = build_notification_payload(notif)
 
