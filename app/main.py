@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
 from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
 from .models import Message, User, Board, Tag, Card
@@ -11,6 +11,7 @@ from .tag import tag_bp
 from .card import card_bp
 from .realtime import realtime_bp
 from .services.notifications import create_notification
+from .services.pusher_client import get_pusher_client
 from datetime import timedelta
 import os
 
@@ -54,8 +55,6 @@ app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
 
 # Pusher Auth endpoint
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from .services.pusher_client import get_pusher_client
 
 @app.route("/pusher/auth", methods=["POST"])
 @jwt_required()
@@ -96,7 +95,6 @@ def handle_options_request():
         return '', 204
 
 #PRUEBA PUSHER----------------------------------------------------------------------------------------------------------
-from .database import db
 
 @app.route("/test-notif", methods=["POST"])
 def test_notification():
