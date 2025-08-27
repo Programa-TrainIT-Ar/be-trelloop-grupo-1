@@ -82,7 +82,7 @@ def create_card():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-    
+
 # MOSTRAR TARJETAS DE UN TABLERO (TODOS)-------------------------------------------------------------------------------------------------------
 @card_bp.route("/getCards/<int:board_id>", methods=["GET"])
 @jwt_required()
@@ -123,7 +123,7 @@ def update_card(card_id):
         card.responsable_id = data.get("responsableId", card.responsable_id)
         card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
         card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
-        
+
         # ARREGLAR: Convertir string a Enum State
         state_value = data.get("state")
         if state_value:
@@ -179,7 +179,7 @@ def add_memember(card_id):
         user= User.query.get(current_user_id)
         if not user:
             return jsonify({"Warning":"Usuario no encontrado"}),404
-        
+
         data=request.get_json()
         user_id=data.get("userId")
         print(request.data)
@@ -187,17 +187,17 @@ def add_memember(card_id):
 
         if not user_id:
             return jsonify({"Warning":"Datos incompletos"}),400
-        
+
         card = Card.query.get(card_id)
         if not card:
             return jsonify({"Warning":"Tarjeta no encontrada"}),404
-        
+
         user_to_add = User.query.get(user_id)
         if not user_to_add:
             return jsonify({"Warning":"Usuario no encontrado"}),404
         if user_to_add in card.members:
             return jsonify({"Warning":"El usuario ya es miembro de la tarjeta"}),400
-        
+
         card.members.append(user_to_add)
         db.session.commit()
 
@@ -225,7 +225,7 @@ def add_memember(card_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"Warning": str(error)}), 500
- 
+
 # ELIMINAR MIEMBROS DE UNA TARJETA -----------------------------------------------------------
 @card_bp.route("/removeMember/<int:card_id>", methods=["DELETE"])
 @jwt_required()
@@ -260,7 +260,7 @@ def remove_member_from_card(card_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
+# OBTENER MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
 @card_bp.route("/getMembers/<int:card_id>", methods=['GET'])
 @jwt_required()
 def get_members(card_id):
@@ -271,8 +271,8 @@ def get_members(card_id):
         members=[member.serialize() for member in card.members]
         return jsonify(members),200
     except Exception as error:
-        return jsonify({"Warning":str(error)}),500 
-    
+        return jsonify({"Warning":str(error)}),500
+
 # Endpoint solo para pruebas locales, se debe elimnar--------------------------------
 @card_bp.route("/debug/trigger_notification", methods=["POST"])
 @jwt_required()
@@ -302,38 +302,5 @@ def debug_trigger_notification():
         current_app.logger.exception("Error debug trigger")
         return jsonify({"error": str(e)}), 500
 
-    
-# Endpoint de autenticación Pusher (canales privados) ----------------------------
-@card_bp.route("/pusher/auth", methods=["POST"])
-@jwt_required()
-def pusher_auth():
-    """
-    Endpoint que Pusher JS llama para autenticar canales privados.
-    Se espera form-data (o JSON) con 'channel_name' y 'socket_id'.
-    Requerimos JWT para validar que el usuario está autenticado y sólo
-    pueda autenticarse en su propio canal 'private-user-<user_id>'.
-    """
-    try:
-        # extraer datos (soportamos form-data y JSON)
-        data_json = request.get_json(silent=True) or {}
-        channel_name = request.form.get("channel_name") or data_json.get("channel_name")
-        socket_id = request.form.get("socket_id") or data_json.get("socket_id")
-
-        if not channel_name or not socket_id:
-            return jsonify({"error": "channel_name and socket_id are required"}), 400
-
-        # verificar que el canal corresponde al usuario autenticado
-        user_id = get_jwt_identity()
-        expected_channel = f"private-user-{user_id}"
-        if channel_name != expected_channel:
-            return jsonify({"error": "forbidden - channel mismatch"}), 403
-
-        # generar la firma usando el cliente pusher (usa las credenciales PUSHER_* en el env)
-        pusher_client = get_pusher_client()
-        auth = pusher_client.authenticate(channel=channel_name, socket_id=socket_id)
-
-        return jsonify(auth)
-
-    except Exception as e:
-        current_app.logger.exception("Pusher auth failed")
-        return jsonify({"error": "authentication failed"}), 500
+# NOTA: El endpoint /pusher/auth se movió a main.py en la raíz de la aplicación
+# para coincidir con la configuración del frontend que espera /pusher/auth

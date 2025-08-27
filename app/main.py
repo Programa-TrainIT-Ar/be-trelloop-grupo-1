@@ -53,6 +53,42 @@ app.register_blueprint(tag_bp, url_prefix="/tag")
 app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
 
+# Pusher Auth endpoint
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from .services.pusher_client import get_pusher_client
+
+@app.route("/pusher/auth", methods=["POST"])
+@jwt_required()
+def pusher_auth():
+    """
+    Endpoint de autenticación para canales privados de Pusher.
+    Debe estar en la raíz para coincidir con la configuración del frontend.
+    """
+    # Usuario autenticado por JWT
+    user_id = str(get_jwt_identity())
+
+    # Leer datos ya sea desde form-data o JSON
+    channel_name = request.form.get("channel_name") or (request.json or {}).get("channel_name")
+    socket_id = request.form.get("socket_id") or (request.json or {}).get("socket_id")
+
+    if not channel_name or not socket_id:
+        return jsonify({"error": "channel_name y socket_id son requeridos"}), 400
+
+    # Solo permitir el canal privado del propio usuario
+    expected_channel = f"private-user-{user_id}"
+    if channel_name != expected_channel:
+        app.logger.warning(f"[pusher_auth] User {user_id} tried to auth for channel {channel_name}")
+        return jsonify({"error": "Forbidden channel"}), 403
+
+    try:
+        client = get_pusher_client()
+        auth_payload = client.authenticate(channel=channel_name, socket_id=socket_id)
+        app.logger.info(f"[pusher_auth] Authenticated user {user_id} for channel {channel_name}")
+        return jsonify(auth_payload), 200
+    except Exception as e:
+        app.logger.error(f"[pusher_auth] Error: {e}")
+        return jsonify({"error": "Pusher auth failed"}), 500
+
 
 @app.before_request
 def handle_options_request():
