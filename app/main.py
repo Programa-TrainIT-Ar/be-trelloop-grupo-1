@@ -10,6 +10,7 @@ from .board import board_bp
 from .tag import tag_bp
 from .card import card_bp
 from .realtime import realtime_bp
+from .subtask import subtask_bp
 from datetime import timedelta
 import os
 
@@ -51,6 +52,7 @@ app.register_blueprint(board_bp, url_prefix="/board")
 app.register_blueprint(tag_bp, url_prefix="/tag")
 app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
+app.register_blueprint(subtask_bp, url_prefix="/subtask")
 
 
 @app.before_request

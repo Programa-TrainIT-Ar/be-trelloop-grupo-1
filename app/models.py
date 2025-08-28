@@ -1,6 +1,6 @@
 from .database import db
 import bcrypt
-import enum
+# import enum------------------(pendiente borrar si ya no se usa)
 
 #Tabla pivote para declarar relación muchos a muchos entre usuarios y tableros
 board_user_association = db.Table('board_user_association',
@@ -109,6 +109,7 @@ class Tag(db.Model):
             "name": self.name
         }
 
+#------------------(pendiente borrar si ya no se usa)
 # class State(enum.Enum):
 #     TODO = "To Do"
 #     IN_PROGRESS = "In Progress"
@@ -188,4 +189,29 @@ class Notification(db.Model):
             "read": self.read,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "eventId": self.event_id,
+        }
+
+class Subtask(db.Model):
+    __tablename__ = "subtasks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(255), nullable=False)
+    limit_date = db.Column(db.DateTime, nullable=True)
+
+    # Relación con usuario responsable
+    responsible_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    responsible = db.relationship("User", backref="subtasks")
+    # Relación con la tarjeta (cada subtask pertenece a una card)
+    card_id = db.Column(db.Integer, db.ForeignKey("cards.id"), nullable=False)
+    # Estado activa/inactiva
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "description": self.description,
+            "limitDate": self.limit_date.isoformat() if self.limit_date else None,
+            "responsible": self.responsible.serialize() if self.responsible else None,
+            "cardId": self.card_id,
+            "isActive": self.is_active,
         }
