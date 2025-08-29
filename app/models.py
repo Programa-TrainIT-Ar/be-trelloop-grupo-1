@@ -1,4 +1,5 @@
 from .database import db
+from datetime import datetime
 import bcrypt
 # import enum------------------(pendiente borrar si ya no se usa)
 
@@ -225,4 +226,45 @@ class Subtask(db.Model):
             "responsible": self.responsible.serialize() if self.responsible else None,
             "cardId": self.card_id,
             "isActive": self.is_active,
+        }
+    
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    card_id = db.Column(db.Integer, db.ForeignKey("cards.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    parent_id = db.Column(db.Integer, db.ForeignKey("comments.id"), nullable=True, index=True)
+
+    content   = db.Column(db.Text, nullable=False)
+    is_edited = db.Column(db.Boolean, default=False, nullable=False)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    updated_at = db.Column(db.DateTime, nullable=True)
+
+ 
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    __table_args__ = (
+        db.Index("idx_comments_card_created", "card_id", "created_at"),
+    )
+
+    def serialize(self, *, include_deleted_content: bool = False):
+        is_deleted = self.deleted_at is not None
+        return {
+            "id": self.id,
+            "cardId": self.card_id,
+            "userId": self.user_id,
+            "parentId": self.parent_id,
+            "content": (self.content if (not is_deleted or include_deleted_content) else None),
+            "placeholder": ("Comentario eliminado" if is_deleted else None),
+            "isEdited": self.is_edited,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
+            "deleted": is_deleted,
+            "deletedAt": self.deleted_at.isoformat() if self.deleted_at else None,
+            "deletedBy": self.deleted_by,
         }

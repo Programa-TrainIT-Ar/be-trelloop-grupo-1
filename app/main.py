@@ -4,7 +4,7 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from .config import DATABASE_URL, CORS_ORIGINS, DEBUG, JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES, JWT_REFRESH_TOKEN_EXPIRES
 from .database import db, initialize_database
-from .models import Message, User, Board, Tag, Card
+from .models import Message, User, Board, Tag, Card, Comment
 from .auth import auth_bp
 from .board import board_bp
 from .tag import tag_bp
@@ -13,6 +13,9 @@ from .realtime import realtime_bp
 from .services.notifications import create_notification
 from .services.pusher_client import get_pusher_client
 from datetime import timedelta
+from .subtask import subtask_bp
+from .comment import comment_bp
+from . import models 
 import os
 
 app = Flask(__name__)
@@ -53,7 +56,8 @@ app.register_blueprint(board_bp, url_prefix="/board")
 app.register_blueprint(tag_bp, url_prefix="/tag")
 app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
-
+app.register_blueprint(subtask_bp, url_prefix="/subtask")
+app.register_blueprint(comment_bp, url_prefix="/comment")
 # Pusher Auth endpoint
 
 @app.route("/pusher/auth", methods=["POST"])
