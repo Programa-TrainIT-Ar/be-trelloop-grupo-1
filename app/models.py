@@ -1,6 +1,9 @@
 from .database import db
 from datetime import datetime
 import bcrypt
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 # import enum------------------(pendiente borrar si ya no se usa)
 
 #Tabla pivote para declarar relación muchos a muchos entre usuarios y tableros
@@ -135,10 +138,8 @@ class Card(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.String(255), nullable=False, default='To Do') 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
+
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
-
-
-   
     members = db.relationship('User', secondary='card_user_association', backref='cards')
 
     def serialize(self):
@@ -159,7 +160,7 @@ class Card(db.Model):
 class Notification(db.Model):
     __tablename__ = "notifications"
 
-    id = db.Column(db.String(36), primary_key=True) 
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Tipo y contenido
@@ -188,7 +189,7 @@ class Notification(db.Model):
 
     def serialize(self):
         return {
-            "id": self.id,
+            "id": str(self.id),  
             "userId": self.user_id,
             "type": self.type,
             "title": self.title,

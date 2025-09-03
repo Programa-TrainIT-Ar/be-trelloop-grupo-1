@@ -21,7 +21,8 @@ def build_notification_payload(n: Notification) -> dict:
         } if n.resource_kind and n.resource_id else None,
         "actorId": n.actor_id,
         "read": n.read,
-        "createdAt": n.created_at.isoformat() + "Z" if n.created_at else None,
+        "createdAt": n.
+        created_at.isoformat() + "Z" if n.created_at else None,
     }
 
 def create_notification(
@@ -48,7 +49,7 @@ def create_notification(
             return existing
 
     notif = Notification(
-        id=str(uuid.uuid4()),
+      
         user_id=int(user_id) if user_id is not None and str(user_id).isdigit() else user_id,
         type=type_,
         title=title,
@@ -61,8 +62,8 @@ def create_notification(
         event_id=event_id,
     )
     db.add(notif)
-    # db.commit()
-    # db.refresh(notif)
+    db.commit()
+    db.refresh(notif)
 
     payload = build_notification_payload(notif)
 
