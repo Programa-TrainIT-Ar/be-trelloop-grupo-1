@@ -21,4 +21,6 @@ def send_email(to: str, subject: str, html: str) -> bool:
         },
         timeout=10,
     )
+    print(f"Status: {resp.status_code}")
+    print(f"Response: {resp.text}")
     return resp.status_code in (200, 202)
