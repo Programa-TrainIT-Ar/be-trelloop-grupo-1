@@ -99,19 +99,20 @@ def create_notification(
             cta = ""
             
             # Generar URL y botón de acción
-            resource_url = get_resource_url(resource_kind, resource_id, db)
-            if resource_url:
-                button_text = "Abrir Tablero" if resource_kind == "board" else "Abrir Tarjeta"
-                button_color = "#007bff" if resource_kind == "board" else "#28a745"
-              
-                cta = f'''
-                <div style="margin: 20px 0; text-align: center;">
-                    <a href="{resource_url}" 
-                       style="background-color: {button_color}; color: white; padding: 12px 24px; 
-                              text-decoration: none; border-radius: 5px; display: inline-block;
-                              font-weight: bold; font-size: 14px;">{button_text}</a>
-                </div>
-                '''
+            # COMENTADO: Botón deshabilitado temporalmente
+            # resource_url = get_resource_url(resource_kind, resource_id, db)
+            # if resource_url:
+            #     button_text = "Abrir Tablero" if resource_kind == "board" else "Abrir Tarjeta"
+            #     button_color = "#007bff" if resource_kind == "board" else "#28a745"
+            #   
+            #     cta = f'''
+            #     <div style="margin: 20px 0; text-align: center;">
+            #         <a href="{resource_url}" 
+            #            style="background-color: {button_color}; color: white; padding: 12px 24px; 
+            #                   text-decoration: none; border-radius: 5px; display: inline-block;
+            #                   font-weight: bold; font-size: 14px;">{button_text}</a>
+            #     </div>
+            #     '''
 
             html = f"""
             <!DOCTYPE html>
@@ -139,7 +140,7 @@ def create_notification(
             </body>
             </html>
             """
-            current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject} resource_url={resource_url}")
+            current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject}")
             send_email(user_email, subject, html)
         except Exception as e:
             current_app.logger.exception(f"[notifications] Error sending email to {user_email}: {e}")
