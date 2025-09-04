@@ -269,34 +269,5 @@ def get_members(card_id):
     except Exception as error:
         return jsonify({"Warning":str(error)}),500
 
-# Endpoint solo para pruebas locales, se debe elimnar--------------------------------
-@card_bp.route("/debug/trigger_notification", methods=["POST"])
-@jwt_required()
-def debug_trigger_notification():
-    """Endpoint de ayuda: dispara una notificación manual para probar Pusher"""
-    try:
-        data = request.get_json() or {}
-        target_user = data.get("userId")
-        if not target_user:
-            return jsonify({"error": "userId requerido en body"}), 400
-
-        payload = {
-            "id": "debug-" + (str(uuid.uuid4())[:8]),
-            "type": "DEBUG",
-            "title": "Notificación de prueba",
-            "message": "Este es un test lanzado manualmente",
-            "resource": None,
-            "actorId": get_jwt_identity(),
-            "read": False,
-            "createdAt": datetime.utcnow().isoformat() + "Z",
-        }
-
-        from .services.pusher_client import trigger_user_notification
-        trigger_user_notification(str(target_user), payload, private=True)
-        return jsonify({"ok": True, "sent_to": target_user}), 200
-    except Exception as e:
-        current_app.logger.exception("Error debug trigger")
-        return jsonify({"error": str(e)}), 500
-
 # NOTA: El endpoint /pusher/auth se movió a main.py en la raíz de la aplicación
 # para coincidir con la configuración del frontend que espera /pusher/auth
