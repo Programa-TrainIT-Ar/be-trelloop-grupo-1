@@ -9,6 +9,24 @@ from flask import current_app
 
 FRONTEND_BASE = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
 
+def get_resource_url(resource_kind: str, resource_id: str, db: Session) -> str | None:
+    """Genera la URL correcta para el recurso en el frontend"""
+    if not resource_kind or not resource_id:
+        return None
+        
+    try:
+        if resource_kind == "board":
+            return f"{FRONTEND_BASE}/dashboard/board/{resource_id}"
+        elif resource_kind == "card":
+            from ..models import Card
+            card = db.query(Card).filter(Card.id == resource_id).first()
+            if card and card.board_id:
+                return f"{FRONTEND_BASE}/dashboard/board/{card.board_id}?cardId={resource_id}"
+        return None
+    except Exception as e:
+        current_app.logger.error(f"Error generating resource URL: {e}")
+        return None
+
 def build_notification_payload(n: Notification) -> dict:
     return {
         "id": n.id,
@@ -79,20 +97,49 @@ def create_notification(
         try:
             subject = title
             cta = ""
-            if resource_kind == "board" and resource_id:
-                cta = f'<p><a href="{FRONTEND_BASE}/board/{resource_id}">Abrir tablero</a></p>'
-            elif resource_kind == "card" and resource_id:
-                cta = f'<p><a href="{FRONTEND_BASE}/board/cards/{resource_id}">Abrir tarjeta</a></p>'
+            
+            # Generar URL y botón de acción
+            resource_url = get_resource_url(resource_kind, resource_id, db)
+            if resource_url:
+                button_text = "Abrir Tablero" if resource_kind == "board" else "Abrir Tarjeta"
+                button_color = "#007bff" if resource_kind == "board" else "#28a745"
+              
+                cta = f'''
+                <div style="margin: 20px 0; text-align: center;">
+                    <a href="{resource_url}" 
+                       style="background-color: {button_color}; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 5px; display: inline-block;
+                              font-weight: bold; font-size: 14px;">{button_text}</a>
+                </div>
+                '''
 
             html = f"""
-            <div style="font-family:Arial,sans-serif">
-              <h3>{title}</h3>
-              <p>{message}</p>
-              {cta}
-              <p style="color:#888;font-size:12px">Enviado por TrainIT</p>
-            </div>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>{title}</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f4f4f4;">
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="border-left: 4px solid #007bff; padding-left: 20px; margin-bottom: 20px;">
+                            <h2 style="color: #333; margin: 0 0 10px 0; font-size: 24px;">{title}</h2>
+                        </div>
+                        <p style="color: #555; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">{message}</p>
+                        {cta}
+                        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0 20px 0;">
+                        <div style="text-align: center;">
+                            <p style="color: #888; font-size: 12px; margin: 0;">Enviado por TrainIT</p>
+                            <p style="color: #aaa; font-size: 11px; margin: 5px 0 0 0;">Sistema de Gestión de Proyectos</p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
             """
-            current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject}")
+            current_app.logger.info(f"[notifications] Sending email to {user_email} subject={subject} resource_url={resource_url}")
             send_email(user_email, subject, html)
         except Exception as e:
             current_app.logger.exception(f"[notifications] Error sending email to {user_email}: {e}")
