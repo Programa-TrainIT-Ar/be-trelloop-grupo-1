@@ -252,13 +252,16 @@ class Comment(db.Model):
     __table_args__ = (
         db.Index("idx_comments_card_created", "card_id", "created_at"),
     )
-
+    user = db.relationship("User", foreign_keys=[user_id])
     def serialize(self, *, include_deleted_content: bool = False):
         is_deleted = self.deleted_at is not None
+        u = self.user  
+
         return {
             "id": self.id,
             "cardId": self.card_id,
-            "userId": self.user_id,
+            "userId": self.user_id,                      
+            "user": u.serialize() if u else None,          
             "parentId": self.parent_id,
             "content": (self.content if (not is_deleted or include_deleted_content) else None),
             "placeholder": ("Comentario eliminado" if is_deleted else None),

@@ -3,6 +3,15 @@ from flask_cors import CORS
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from .models import db, User, Card, Board, Comment
+from sqlalchemy.orm import joinedload
+
+q = (
+    Comment.query
+    .options(joinedload(Comment.user)) 
+    .filter_by(card_id=card_id)
+    .order_by(Comment.created_at.asc())
+)
+rows = q.limit(limit).offset(offset).all()
 
 comment_bp = Blueprint("comment", __name__)
 CORS(comment_bp)
