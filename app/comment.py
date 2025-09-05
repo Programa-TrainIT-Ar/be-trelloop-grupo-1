@@ -5,14 +5,6 @@ from datetime import datetime
 from .models import db, User, Card, Board, Comment
 from sqlalchemy.orm import joinedload
 
-q = (
-    Comment.query
-    .options(joinedload(Comment.user)) 
-    .filter_by(card_id=card_id)
-    .order_by(Comment.created_at.asc())
-)
-rows = q.limit(limit).offset(offset).all()
-
 comment_bp = Blueprint("comment", __name__)
 CORS(comment_bp)
 
@@ -84,7 +76,9 @@ def create_comment():
 @jwt_required()
 def list_comments():
     try:
-        user_id = (get_jwt_identity())
+        user_id = get_jwt_identity()
+        uid = int(user_id) if isinstance(user_id, str) and str(user_id).isdigit() else user_id
+
         card_id = request.args.get("cardId", type=int)
         include_deleted = request.args.get("include_deleted", "false").lower() == "true"
         limit  = request.args.get("limit", 100, type=int)
@@ -97,16 +91,22 @@ def list_comments():
         if not card:
             return jsonify({"error": "Tarjeta no encontrada"}), 404
 
-        if not _user_can_view_card(user_id, card):
+        if not _user_can_view_card(uid, card):
             return jsonify({"error": "No tienes acceso a esta tarjeta"}), 403
 
-        q = Comment.query.filter_by(card_id=card_id).order_by(Comment.created_at.asc())
+        q = (Comment.query
+             .options(joinedload(Comment.user))   
+             .filter(Comment.card_id == card_id))
+
+        if not include_deleted:
+            q = q.filter(Comment.deleted_at.is_(None))
+
+        q = q.order_by(Comment.created_at.asc())
+
         total = q.count()
         rows = q.limit(limit).offset(offset).all()
 
-        payload = [
-            c.serialize(include_deleted_content=include_deleted) for c in rows
-        ]
+        payload = [c.serialize(include_deleted_content=include_deleted) for c in rows]
 
         return jsonify({
             "items": payload,
