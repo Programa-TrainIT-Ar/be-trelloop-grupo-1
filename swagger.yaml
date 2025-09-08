@@ -412,37 +412,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /board/getBoards:
-    get:
-      tags:
-        - Tableros
-      summary: Obtener todos los tableros accesibles
-      description: Retorna todos los tableros a los que el usuario tiene acceso (propios y compartidos).
-      operationId: getBoards
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Lista de tableros obtenida exitosamente
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Board"
-        "401":
-          description: Token inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Error interno del servidor
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   /board/getMyBoards:
     get:
       tags:
