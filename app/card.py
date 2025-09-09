@@ -2,7 +2,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, State, User, Tag
+from .models import db, Board, Card, User
+from .services.notifications import create_notification
+from .services.pusher_client import get_pusher_client
+import uuid
 
 
 card_bp = Blueprint("card", __name__)
@@ -52,6 +55,28 @@ def create_card():
         db.session.add(new_card)
         db.session.commit()
 
+        # Si se asignó un responsable, crear notificación para esa persona
+        if responsable_id:
+            try:
+                event_id = f"card:{new_card.id}:assigned:{responsable_id}"
+                assignee = User.query.get(responsable_id)
+                if assignee:
+                    create_notification(
+                        db.session,
+                        user_id=str(assignee.id),
+                        type_="CARD_ASSIGNED",
+                        title="Te asignaron una tarjeta",
+                        message=f"Has sido asignado a la tarjeta '{new_card.title}' en el tablero '{board.name}'.",
+                        resource_kind="card",
+                        resource_id=str(new_card.id),
+                        actor_id=str(user_id),
+                        event_id=event_id,
+                        user_email=assignee.email,
+                        send_email_also=True
+                    )
+            except Exception as notif_err:
+                print(f"[Notification Error] {notif_err}")
+
         return jsonify({"message": "Tarjeta creada correctamente", "card": new_card.serialize()}), 201
 
     except Exception as e:
@@ -98,16 +123,12 @@ def update_card(card_id):
         card.responsable_id = data.get("responsableId", card.responsable_id)
         card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
         card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
-        
+
         # ARREGLAR: Convertir string a Enum State
         state_value = data.get("state")
         if state_value:
-            if state_value == "TODO":
-                card.state = State.TODO
-            elif state_value == "IN_PROGRESS":
-                card.state = State.IN_PROGRESS
-            elif state_value == "DONE":
-                card.state = State.DONE
+            card.state = state_value
+            
 
         # Manejar etiquetas
         if 'tags' in data:
@@ -154,7 +175,7 @@ def add_memember(card_id):
         user= User.query.get(current_user_id)
         if not user:
             return jsonify({"Warning":"Usuario no encontrado"}),404
-        
+
         data=request.get_json()
         user_id=data.get("userId")
         print(request.data)
@@ -162,25 +183,45 @@ def add_memember(card_id):
 
         if not user_id:
             return jsonify({"Warning":"Datos incompletos"}),400
-        
+
         card = Card.query.get(card_id)
         if not card:
             return jsonify({"Warning":"Tarjeta no encontrada"}),404
-        
+
         user_to_add = User.query.get(user_id)
         if not user_to_add:
             return jsonify({"Warning":"Usuario no encontrado"}),404
         if user_to_add in card.members:
             return jsonify({"Warning":"El usuario ya es miembro de la tarjeta"}),400
-        
+
         card.members.append(user_to_add)
         db.session.commit()
-        return jsonify({"Message":"Miembro agregado correctamente"}),200   
-      
+
+        # Crear notificación para el usuario agregado a la tarjeta
+        try:
+            event_id = f"card:{card_id}:member_added:{user_to_add.id}"
+            create_notification(
+                db.session,
+                user_id=str(user_to_add.id),
+                type_="CARD_ASSIGNED",
+                title="Te agregaron a una tarjeta",
+                message=f"{user.first_name} {user.last_name} te agregó a la tarjeta '{card.title}' en el tablero '{card.board.name}'.",
+                resource_kind="card",
+                resource_id=str(card.id),
+                actor_id=str(user.id),
+                event_id=event_id,
+                user_email=user_to_add.email,
+                send_email_also=True
+            )
+        except Exception as notif_err:
+            print(f"[Notification Error] {notif_err}")
+
+        return jsonify({"Message": "Miembro agregado correctamente"}), 200
+
     except Exception as error:
         db.session.rollback()
-        return jsonify({"Warning":str(error)}),500
- 
+        return jsonify({"Warning": str(error)}), 500
+
 # ELIMINAR MIEMBROS DE UNA TARJETA -----------------------------------------------------------
 @card_bp.route("/removeMember/<int:card_id>", methods=["DELETE"])
 @jwt_required()
@@ -215,7 +256,7 @@ def remove_member_from_card(card_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# OBTENER MIEMBROS DE UNA TARJETA------------------------------------------------------------------------------------------------------- 
+# OBTENER MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
 @card_bp.route("/getMembers/<int:card_id>", methods=['GET'])
 @jwt_required()
 def get_members(card_id):
@@ -227,6 +268,6 @@ def get_members(card_id):
         return jsonify(members),200
     except Exception as error:
         return jsonify({"Warning":str(error)}),500
-    
 
-
+# NOTA: El endpoint /pusher/auth se movió a main.py en la raíz de la aplicación
+# para coincidir con la configuración del frontend que espera /pusher/auth

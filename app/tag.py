@@ -1,9 +1,16 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS, cross_origin
 from sqlalchemy import func
 from .models import db, User, Tag
 
 tag_bp = Blueprint("tag", __name__)
+CORS(tag_bp)
+
+@tag_bp.before_request
+def handle_options_request():
+    if request.method == 'OPTIONS':
+        return '', 204
 
 def _require_user():
     current_user_id = get_jwt_identity()
@@ -35,6 +42,7 @@ def get_all_tags():
 # BUSCAR ETIQUETA POR NOMBRE 
 # =========================
 @tag_bp.route("/by-name/<string:name>", methods=["GET"])
+@cross_origin()
 @jwt_required()
 def get_tag_by_name(name):
     user, err = _require_user()
@@ -110,4 +118,4 @@ def update_tag(tag_id):
         return jsonify({"success": True, "tag": tag.serialize()}), 200
     except Exception as error:
         db.session.rollback()
-        return jsonify({"error": str(error)}), 500
+        return jsonify({"error": str(error)}),500
