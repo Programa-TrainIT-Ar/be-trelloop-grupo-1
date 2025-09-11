@@ -1,3 +1,4 @@
+# INFO: DATOS GENERALES DE LA API======================================================================
 openapi: 3.0.3
 info:
   title: Trelloop API - Backend Grupo 1
@@ -11,6 +12,7 @@ info:
     - **Etiquetas**: Sistema de categorización mediante tags
     - **Usuarios**: Búsqueda y gestión de miembros
     - **Mensajes**: Sistema básico de mensajería (ejemplo/prueba)
+    - **Notificaciones**: Sistema de notificaciones en tiempo real.
 
     ## Autenticación
     La API utiliza JWT (JSON Web Tokens) para la autenticación. Los endpoints protegidos requieren
@@ -37,7 +39,7 @@ servers:
     description: Servidor de desarrollo local
   - url: https://your-production-url.com
     description: Servidor de producción
-
+# PATHS: ENDPOINTS DE LA API=============================================================================
 paths:
   # ============ AUTENTICACIÓN ============
   /auth/login:
@@ -397,37 +399,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Token inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Error interno del servidor
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /board/getBoards:
-    get:
-      tags:
-        - Tableros
-      summary: Obtener todos los tableros accesibles
-      description: Retorna todos los tableros a los que el usuario tiene acceso (propios y compartidos).
-      operationId: getBoards
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: Lista de tableros obtenida exitosamente
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Board"
         "401":
           description: Token inválido
           content:
@@ -1581,6 +1552,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  # ============ NOTIFICACIONES ============
+  /notifications:
+    post:
+      tags:
+        - Notifications
+      summary: Crear una nueva notificación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationRequest"
+      responses:
+        "201":
+          description: Notificación creada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "400":
+          description: Error en la solicitud
+        "500":
+          description: Error interno del servidor
+
+  /notifications/{userId}:
+    get:
+      tags:
+        - Notifications
+      summary: Obtener todas las notificaciones de un usuario
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID del usuario
+      responses:
+        "200":
+          description: Lista de notificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+        "404":
+          description: Usuario no encontrado
+        "500":
+          description: Error interno del servidor
+
   # ============ MENSAJES ============
   /message:
     get:
@@ -1659,6 +1680,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+# COMPONENTS/SCHEMAS: MODELOS DE DATOS REUTILIZABLES======================================================
 components:
   securitySchemes:
     BearerAuth:
@@ -1911,6 +1933,88 @@ components:
         - refresh_token
         - token_type
 
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único de la notificación
+        userId:
+          type: integer
+          description: ID del usuario receptor
+        type:
+          type: string
+          description: Tipo de notificación
+        title:
+          type: string
+          description: Título de la notificación
+        message:
+          type: string
+          description: Contenido de la notificación
+        resource:
+          $ref: "#/components/schemas/NotificationResource"
+          nullable: true
+        actorId:
+          type: integer
+          nullable: true
+          description: ID del actor que generó la notificación
+        read:
+          type: boolean
+          description: Estado de lectura de la notificación
+        createdAt:
+          type: string
+          format: date-time
+          description: Fecha de creación de la notificación
+        eventId:
+          type: string
+          nullable: true
+          description: ID de evento para asegurar idempotencia
+      required:
+        - id
+        - userId
+        - type
+        - title
+        - message
+        - read
+        - createdAt
+
+    CreateNotificationRequest:
+      type: object
+      properties:
+        userId:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        resourceKind:
+          type: string
+          nullable: true
+        resourceId:
+          type: integer
+          nullable: true
+        actorId:
+          type: integer
+          nullable: true
+        eventId:
+          type: string
+          nullable: true
+        userEmail:
+          type: string
+          nullable: true
+        sendEmailAlso:
+          type: boolean
+          default: true
+      required:
+        - userId
+        - type
+        - title
+        - message
+
+#TAGS: AGRUPACIONES DESCRIPTIVAS DE ENDPOINTS===========================================================
 tags:
   - name: Autenticación
     description: |
@@ -1964,6 +2068,22 @@ tags:
     description: |
       Endpoints para gestión de mensajes básicos.
       **Nota**: Estos son endpoints de ejemplo/prueba para validar la funcionalidad básica de la API.
+
+  - name: Notificaciones
+    description: |
+      Endpoints para la gestión completa de notificaciones de usuarios.
+
+      ### Funcionalidades principales:
+      1. **Crear notificación**: POST /notifications - Genera una nueva notificación para un usuario.  
+         Soporta envío opcional por email y asegura idempotencia mediante `eventId`.
+      2. **Listar notificaciones**: GET /notifications/{userId} - Obtiene todas las notificaciones de un usuario.
+      3. **Estado de lectura**: Las notificaciones tienen un campo `read` que indica si fueron leídas.
+      4. **Recursos relacionados**: Las notificaciones pueden estar asociadas a un recurso (`board`, `card`, etc.) para redirigir al frontend.
+
+      ### Consideraciones:
+      - Para el envío de emails, se usa `userEmail` y `sendEmailAlso` en la creación.
+      - Los `eventId` permiten que una misma acción no genere múltiples notificaciones.
+      - El frontend puede usar el campo `resource` para generar links a tableros o tarjetas específicas.
 
 externalDocs:
   description: Repositorio del proyecto en GitHub

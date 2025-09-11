@@ -40,10 +40,11 @@ def create_subtask():
 
 
 # MOSTRAR TODAS LAS SUBTAREAS-----------------------------------------------------------------------------------
-@subtask_bp.route("/getSubtasks", methods=["GET"])
+@subtask_bp.route("/cards/<int:card_id>/subtasks", methods=["GET"])
 @jwt_required()
-def get_subtasks():
-    subtasks = Subtask.query.filter_by(is_active=True).all()
+def get_subtasks(card_id):
+    # Filtrar solo subtareas activas de la tarjeta indicada
+    subtasks = Subtask.query.filter_by(card_id=card_id, is_active=True).all()
     return jsonify([s.serialize() for s in subtasks]), 200
 
 

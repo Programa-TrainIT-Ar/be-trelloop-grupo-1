@@ -113,26 +113,6 @@ def create_board():
         db.session.rollback()
         return jsonify({"error": str(error)}), 500
 
-#OBTENER TABLEROS (TODOS)-------------------------------------------------------------------------------------------------------
-@board_bp.route("/getBoards", methods=["GET"])
-@jwt_required()
-def get_boards():
-    try:
-        # Obtener el usuario actual
-        user_id= get_jwt_identity()
-        user = User.query.get(user_id)
-
-        # Validar si el usuario existe
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-        # Obtener todos los tableros
-        boards=Board.query.all()
-        return jsonify([board.serialize() for board in boards]), 200
-
-    except Exception as error:
-        return jsonify({"Error":str(error)}), 500
-
-
 #OBTENER MIS TABLEROS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/getMyBoards",methods=["GET"])
 @jwt_required()
