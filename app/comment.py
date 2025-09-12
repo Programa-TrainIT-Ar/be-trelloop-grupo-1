@@ -67,16 +67,28 @@ def create_comment():
         db.session.add(c)
         db.session.commit()
 
-        #Notificaciones 
         try:
+            from .services.notifications import create_notification
+
             preview = (content[:50] + "…") if len(content) > 50 else content
-            actor = c.user
+            actor = c.user 
             actor_name = f"{actor.first_name} {actor.last_name}".strip() if actor else "Alguien"
 
             if not parent_id:
-                recipient_ids = {m.id for m in card.members if m.id != user_id}
+                recipient_ids = set()
+
+                if getattr(card, "responsable_id", None):
+                    recipient_ids.add(int(card.responsable_id))
+
+                if getattr(card, "board", None):
+                    recipient_ids.update({m.id for m in card.board.members})
+                    if card.board.user_id:
+                        recipient_ids.add(int(card.board.user_id))
+
+                recipient_ids.discard(int(user_id))
+
                 for rid in recipient_ids:
-                    event_id = f"card:{card.id}:comment:{c.id}:to:{rid}"
+                    event_id = f"card:{card.id}:comment:{c.id}:to:{rid}"  
                     create_notification(
                         db.session,
                         user_id=str(rid),
@@ -91,7 +103,7 @@ def create_comment():
                         send_email_also=False,
                     )
             else:
-                if parent and parent.user_id != user_id:
+                if parent and int(parent.user_id) != int(user_id):
                     event_id = f"card:{card.id}:comment:{parent.id}:reply:{c.id}:to:{parent.user_id}"
                     create_notification(
                         db.session,
@@ -115,6 +127,7 @@ def create_comment():
         db.session.rollback()
         current_app.logger.exception(f"[comments] create failed: {e}")
         return jsonify({"error": "Error creando comentario"}), 500
+
 
 
 # Listar comentarios
