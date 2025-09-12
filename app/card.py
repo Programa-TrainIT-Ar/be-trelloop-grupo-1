@@ -2,10 +2,11 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, User
+from .models import db, Board, Card, User,Tag
 from .services.notifications import create_notification
 from .services.pusher_client import get_pusher_client
 import uuid
+from sqlalchemy import func 
 
 
 card_bp = Blueprint("card", __name__)
@@ -30,7 +31,8 @@ def create_card():
         responsable_id = data.get('responsableId')
         begin_date = data.get('beginDate')
         due_date = data.get('dueDate')
-        state = data.get('state', 'To Do')
+        state = data.get('state', 'TODO')
+        tags_list = data.get('tags', [])
 
         # Validaciones mínimas
         if not title or not board_id:
@@ -39,6 +41,9 @@ def create_card():
         board = Board.query.get(board_id)
         if not board:
             return jsonify({"error": "El tablero no existe"}), 404
+        
+        last_position=db.session.query(func.max(Card.position)).filter_by(board_id=board_id, state=state).scalar()
+        new_position=(last_position+1) if last_position is not None else 0
 
         # Crear tarjeta
         new_card = Card(
@@ -49,10 +54,25 @@ def create_card():
             begin_date=datetime.fromisoformat(begin_date) if begin_date else None,
             due_date=datetime.fromisoformat(due_date) if due_date else None,
             state=state,
-            board_id=board_id
+            board_id=board_id,
+            position=new_position
         )
 
         db.session.add(new_card)
+       
+
+        for tag_name in tags_list:
+            tag_name_clean = tag_name.strip()
+            if not tag_name_clean:
+                continue
+            tag = Tag.query.filter_by(name=tag_name_clean).first()
+            if not tag:
+                tag = Tag(name=tag_name_clean)
+                db.session.add(tag)
+            new_card.tags.append(tag)
+
+
+        
         db.session.commit()
 
         # Si se asignó un responsable, crear notificación para esa persona
@@ -77,7 +97,23 @@ def create_card():
             except Exception as notif_err:
                 print(f"[Notification Error] {notif_err}")
 
-        return jsonify({"message": "Tarjeta creada correctamente", "card": new_card.serialize()}), 201
+            card_data = {
+                "id": new_card.id,
+                "title": new_card.title,
+                "description": new_card.description,
+                "responsableId": new_card.responsable_id,
+                "creationDate": new_card.creation_date.isoformat(),
+                "beginDate": new_card.begin_date.isoformat() if new_card.begin_date else None,
+                "dueDate": new_card.due_date.isoformat() if new_card.due_date else None,
+                "state": new_card.state,
+                "boardId": new_card.board_id,
+                "position": new_card.position,
+                "tags": [t.name for t in new_card.tags],
+                "members": [m.serialize() for m in new_card.members]
+            }
+
+            return jsonify({"message": "Tarjeta creada correctamente", "card": card_data}), 201
+        
 
     except Exception as e:
         db.session.rollback()
@@ -88,7 +124,8 @@ def create_card():
 @jwt_required()
 def get_all_cards(board_id):
     try:
-        all_cards = Card.query.filter_by(board_id = board_id)
+        all_cards = Card.query.filter_by(board_id = board_id)\
+            .order_by(Card.position).all()
         if not all_cards:
             return jsonify({"Error": "Tablero no encontrado"}), 404
         return jsonify([card.serialize() for card in all_cards]), 200
@@ -147,7 +184,48 @@ def update_card(card_id):
     except Exception as error:
         db.session.rollback()
         return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
+    
+# ACTUALIAZAR EL ESTADO DE UNA TARJETA---------------------------------------------------------------------------------------------------------------
 
+@card_bp.route("/updateCardStatus/<int:card_id>", methods=["PUT"])
+@jwt_required
+def update_card_status():
+    try:
+        data=request.get_json()
+        card_id=data.get("cardId")
+        board_id=data.get("boardId")
+        new_state=data.get("state")
+        new_position=data.get("position")
+
+        if card_id is None or board_id is None or  new_position is None:
+            return jsonify({"Error":"Datos incompletos"}),400
+        
+        card=Card.query.get(card_id)
+
+        if not card:
+            return jsonify({"Error":"Tarjeta no encontrada"}),404
+        
+        if card.board_id != board_id:
+            return jsonify({"Error":"Tarjeta no encontrada para ese tablero"}),404
+        
+        if new_state and card.state != new_state:
+            card.state=new_state
+
+        cards = Card.query.filter_by(board_id=board_id, state=card.state)\
+            .order_by(Card.position).all()
+        
+        card = [c for c in cards if c.id !=card.id]
+
+        cards.insert(new_position, card)
+
+        for index, c in enumerate(cards):
+            c.position=index
+        
+        db.session.commit()
+        return jsonify({"message", "Posicion actualizada correctamente"}),200
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Error":str(error)}),500
 
 # ELIMINAR UNA TARJETA---------------------------------------------------------------------------------------------------------------
 @card_bp.route("/deleteCard/<int:card_id>", methods=["DELETE"])

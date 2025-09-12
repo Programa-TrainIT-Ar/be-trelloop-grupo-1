@@ -136,9 +136,10 @@ class Card(db.Model):
     creation_date = db.Column(db.DateTime, nullable=False)
     begin_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
-    state = db.Column(db.String(255), nullable=False, default='To Do') 
+    state = db.Column(db.String(255), nullable=False, default='TO DO') 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
 
+    position= db.Column(db.Integer,nullable=True, default=0)
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
     members = db.relationship('User', secondary='card_user_association', backref='cards')
 
@@ -153,6 +154,7 @@ class Card(db.Model):
             "dueDate": self.due_date.isoformat() if self.due_date else None,
             "state": self.state,
             "boardId": self.board_id,
+            "position":self.position,
             "tags":[tag.name for tag in self.tags],
             "members": [member.serialize() for member in self.members]
         }
