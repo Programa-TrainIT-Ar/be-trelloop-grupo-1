@@ -162,7 +162,7 @@ class Card(db.Model):
 class Notification(db.Model):
     __tablename__ = "notifications"
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Tipo y contenido
