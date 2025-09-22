@@ -138,21 +138,30 @@ class Card(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     state = db.Column(db.String(255), nullable=False, default='To Do') 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
+    list_id = db.Column(db.Integer, db.ForeignKey("lists.id", ondelete="SET NULL"), nullable=True, index=True)
+    priority = db.Column(db.String(20), nullable=True)
 
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
     members = db.relationship('User', secondary='card_user_association', backref='cards')
-
+    list = db.relationship("List", backref="cards")
+    
     def serialize(self):
+        list_name = self.list.name if self.list else None
+        state = list_name or self.state
+
         return {
             "id": self.id,
             "title": self.title,
             "description": self.description,
+            "priority": self.priority,
             "responsableId": self.responsable_id,
             "creationDate": self.creation_date.isoformat(),
             "beginDate": self.begin_date.isoformat() if self.begin_date else None,
             "dueDate": self.due_date.isoformat() if self.due_date else None,
             "state": self.state,
             "boardId": self.board_id,
+            "listId": self.list_id,
+            "listName": list_name,
             "tags":[tag.name for tag in self.tags],
             "members": [member.serialize() for member in self.members]
         }
@@ -271,4 +280,31 @@ class Comment(db.Model):
             "deleted": is_deleted,
             "deletedAt": self.deleted_at.isoformat() if self.deleted_at else None,
             "deletedBy": self.deleted_by,
+        }
+
+
+class List(db.Model):
+    __tablename__ = "lists"
+
+    id = db.Column(db.Integer, primary_key=True)
+    board_id = db.Column(db.Integer, db.ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    position = db.Column(db.Integer, nullable=False, default=0)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+    board = db.relationship("Board", backref=db.backref("lists", cascade="all, delete-orphan"))
+
+    __table_args__ = (
+        db.Index("uq_lists_board_lower_name", "board_id", db.text("LOWER(name)"), unique=True),
+    )
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "boardId": self.board_id,
+            "name": self.name,
+            "position": self.position,
+            "createdBy": self.created_by,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
         }

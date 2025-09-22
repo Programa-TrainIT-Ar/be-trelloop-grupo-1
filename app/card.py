@@ -2,10 +2,12 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime
-from .models import db, Board, Card, User
+from .models import db, Board, Card, User, List
 from .services.notifications import create_notification
 from .services.pusher_client import get_pusher_client
 import uuid
+from sqlalchemy import func
+
 
 
 card_bp = Blueprint("card", __name__)
@@ -21,18 +23,24 @@ def handle_options_request():
 @jwt_required()
 def create_card():
     try:
-        user_id = get_jwt_identity()  # Usuario autenticado
-        data = request.get_json()
+        user_id = get_jwt_identity()  
+        data = request.get_json() or {}
 
-        title = data.get('title')
-        description = data.get('description')
-        board_id = data.get('boardId')
+        title          = data.get('title')
+        description    = data.get('description')
+        board_id       = data.get('boardId')
         responsable_id = data.get('responsableId')
-        begin_date = data.get('beginDate')
-        due_date = data.get('dueDate')
-        state = data.get('state', 'To Do')
+        begin_date     = data.get('beginDate')
+        due_date       = data.get('dueDate')
+        list_id        = data.get('listId')                      
+        list_name      = (data.get('listName') or '').strip()   
+        state          = (data.get('state') or '').strip()       
+        priority       = data.get("priority")
 
-        # Validaciones mínimas
+        if priority not in (None, "Baja", "Media", "Alta"):
+            priority = None
+        
+
         if not title or not board_id:
             return jsonify({"error": "El título y el ID del tablero son obligatorios"}), 400
 
@@ -40,7 +48,61 @@ def create_card():
         if not board:
             return jsonify({"error": "El tablero no existe"}), 404
 
-        # Crear tarjeta
+        target_list = None
+        if list_id:
+            target_list = List.query.filter_by(id=list_id, board_id=board_id).first()
+            if not target_list:
+                return jsonify({"error": "La lista indicada no existe en este tablero"}), 400
+
+        elif list_name:
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == list_name.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=list_name,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()  
+
+        elif state:
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == state.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=state,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()
+
+        else:
+            default_name = "Pendiente"
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == default_name.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=default_name,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()
+
         new_card = Card(
             title=title,
             description=description,
@@ -48,14 +110,15 @@ def create_card():
             creation_date=datetime.utcnow(),
             begin_date=datetime.fromisoformat(begin_date) if begin_date else None,
             due_date=datetime.fromisoformat(due_date) if due_date else None,
-            state=state,
-            board_id=board_id
+            board_id=board_id,
+            list_id=target_list.id,      
+            state=target_list.name,
+            priority=priority or auto_priority        
         )
 
         db.session.add(new_card)
         db.session.commit()
 
-        # Si se asignó un responsable, crear notificación para esa persona
         if responsable_id:
             try:
                 event_id = f"card:{new_card.id}:assigned:{responsable_id}"
@@ -83,6 +146,7 @@ def create_card():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+
 # MOSTRAR TARJETAS DE UN TABLERO (TODOS)-------------------------------------------------------------------------------------------------------
 @card_bp.route("/getCards/<int:board_id>", methods=["GET"])
 @jwt_required()
@@ -108,44 +172,101 @@ def get_card(card_id):
         return jsonify({"error": "Se ha producido un error al obtener la tarjeta", "details": str(error)}), 500
 
 # ACTUALIZAR UNA TARJETA EXISTENTE----------------------------------------------------------------------------------------------
-@card_bp.route("/updateCard/<int:card_id>", methods=["PUT"])
+@card_bp.route("/updateCard/<int:card_id>", methods=["PUT", "PATCH"])
 @jwt_required()
 def update_card(card_id):
     try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+
         card = Card.query.get(card_id)
         if not card:
             return jsonify({"error": "Tarjeta no encontrada"}), 404
 
-        data = request.get_json()
+        # --- Campos básicos ---
+        if "title" in data:
+            card.title = data.get("title") or card.title
 
-        card.title = data.get("title", card.title)
-        card.description = data.get("description", card.description)
-        card.responsable_id = data.get("responsableId", card.responsable_id)
-        card.begin_date = datetime.fromisoformat(data["beginDate"]) if data.get("beginDate") else card.begin_date
-        card.due_date = datetime.fromisoformat(data["dueDate"]) if data.get("dueDate") else card.due_date
+        if "description" in data:
+            card.description = data.get("description") or None
 
-        # ARREGLAR: Convertir string a Enum State
+        if "responsableId" in data:
+            card.responsable_id = data.get("responsableId") or None
+
+        if "beginDate" in data:
+            bd = data.get("beginDate")
+            card.begin_date = datetime.fromisoformat(bd) if bd else None
+
+        if "dueDate" in data:
+            dd = data.get("dueDate")
+            card.due_date = datetime.fromisoformat(dd) if dd else None
+
+        # --- Prioridad (manual / opcional) ---
+        if "priority" in data:
+            pr = data.get("priority")
+            card.priority = pr if pr in ("Baja", "Media", "Alta") else None
+
+        # --- Movimiento por Lista (fuente de verdad del estado) ---
+        list_id = data.get("listId")
+        list_name = (data.get("listName") or "").strip()
+        board_id = data.get("boardId") or card.board_id
+
+        if list_id or list_name:
+            if list_id:
+                lst = List.query.filter_by(id=list_id, board_id=board_id).first()
+                if not lst:
+                    return jsonify({"error": "La lista no existe en este tablero"}), 404
+            else:
+                # Buscar por nombre (case-insensitive) o crear al vuelo
+                lst = List.query.filter(
+                    List.board_id == board_id,
+                    func.lower(List.name) == func.lower(list_name)
+                ).first()
+                if not lst:
+                    max_pos = db.session.query(
+                        func.coalesce(func.max(List.position), 0)
+                    ).filter(List.board_id == board_id).scalar() or 0
+
+                    lst = List(
+                        board_id=board_id,
+                        name=list_name,
+                        position=max_pos + 1,
+                        created_by=user_id
+                    )
+                    db.session.add(lst)
+                    db.session.flush()  # obtener lst.id
+
+            card.list_id = lst.id
+            # Compatibilidad con UIs antiguas que leen card.state
+            card.state = lst.name
+
+        # --- Compatibilidad legacy: permitir state directo si no vino lista ---
         state_value = data.get("state")
-        if state_value:
+        if state_value and not (list_id or list_name):
             card.state = state_value
-            
 
-        # Manejar etiquetas
-        if 'tags' in data:
+        # --- Etiquetas ---
+        if "tags" in data:
             card.tags.clear()
-            for tag_name in data['tags']:
-                if tag_name.strip():
-                    tag = Tag.query.filter_by(name=tag_name.strip()).first()
-                    if not tag:
-                        tag = Tag(name=tag_name.strip())
-                        db.session.add(tag)
-                    card.tags.append(tag)
+            for raw in data.get("tags") or []:
+                name = (raw or "").strip()
+                if not name:
+                    continue
+                tag = Tag.query.filter_by(name=name).first()
+                if not tag:
+                    tag = Tag(name=name)
+                    db.session.add(tag)
+                card.tags.append(tag)
 
         db.session.commit()
         return jsonify({"message": "Tarjeta actualizada correctamente", "card": card.serialize()}), 200
 
     except Exception as error:
         db.session.rollback()
+        try:
+            current_app.logger.exception(f"[cards] update failed: {error}")
+        except Exception:
+            pass
         return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
 
 
@@ -268,6 +389,37 @@ def get_members(card_id):
         return jsonify(members),200
     except Exception as error:
         return jsonify({"Warning":str(error)}),500
+
+#Endpoint para mover tarjeta entre listas--------------------------------------------------------------------------------
+@card_bp.route("/move/<int:card_id>", methods=["PATCH"])
+@jwt_required()
+def move_card(card_id: int):
+    user_id = int(get_jwt_identity())
+    data = request.get_json() or {}
+    to_list_id = data.get("toListId")
+
+    card = Card.query.get(card_id)
+    if not card:
+        return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+    board = card.board
+    if not board:
+        return jsonify({"error": "Tablero inválido"}), 400
+
+    # debe ser miembro del tablero
+    if not (board.user_id == user_id or any(m.id == user_id for m in board.members)):
+        return jsonify({"error": "No autorizado"}), 403
+
+    target_list = List.query.filter_by(id=to_list_id, board_id=board.id).first()
+    if not target_list:
+        return jsonify({"error": "Lista destino no encontrada"}), 404
+
+    card.list_id = target_list.id
+    card.state = target_list.name  # sincronía temporal
+    db.session.commit()
+
+    return jsonify(card.serialize()), 200
+
 
 # NOTA: El endpoint /pusher/auth se movió a main.py en la raíz de la aplicación
 # para coincidir con la configuración del frontend que espera /pusher/auth

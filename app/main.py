@@ -15,6 +15,7 @@ from .services.pusher_client import get_pusher_client
 from datetime import timedelta
 from .subtask import subtask_bp
 from .comment import comment_bp
+from .list import list_bp
 from . import models 
 import os
 
@@ -58,6 +59,7 @@ app.register_blueprint(card_bp, url_prefix="/card")
 app.register_blueprint(realtime_bp, url_prefix="/realtime")
 app.register_blueprint(subtask_bp, url_prefix="/subtask")
 app.register_blueprint(comment_bp, url_prefix="/comment")
+app.register_blueprint(list_bp, url_prefix="/list")
 # Pusher Auth endpoint
 
 @app.route("/pusher/auth", methods=["POST"])
