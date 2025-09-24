@@ -110,6 +110,13 @@ def register_user():
         if not first_name or not last_name or not email or not password:
             return jsonify({"error": "Todos los campos son requeridos"}), 400
 
+        name_pattern = r"^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]{3,}"
+
+        if not re.fullmatch(name_pattern,first_name):
+            return jsonify({"error":"Nombre Invadilo"}),400
+        
+        if not re.fullmatch(name_pattern, last_name):
+            return jsonify({"error":"Apellido invalido"}),400
         # Valida el formato del correo
         email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
         if not re.match(email_pattern, email):
