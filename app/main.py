@@ -25,7 +25,7 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["DEBUG"] = DEBUG
 
-CORS(app, origins=CORS_ORIGINS, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 initialize_database(app)
 
 migrate = Migrate(app, db)
