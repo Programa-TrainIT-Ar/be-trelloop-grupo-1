@@ -11,7 +11,7 @@ board_user_association = db.Table('board_user_association',
     db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True), 
 )
 
-#Tabla piovte para declarar relación muchos a muchos entre tableros y etiquetas
+#Tabla pivote para declarar relación muchos a muchos entre tableros y etiquetas
 board_tag_association = db.Table('board_tag_association',
     db.Column('board_id', db.Integer, db.ForeignKey('boards.id'), primary_key=True),
     db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
