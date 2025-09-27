@@ -4,7 +4,6 @@ import bcrypt
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-# import enum------------------(pendiente borrar si ya no se usa)
 
 #Tabla pivote para declarar relación muchos a muchos entre usuarios y tableros
 board_user_association = db.Table('board_user_association',
@@ -121,11 +120,6 @@ class Tag(db.Model):
             "name": self.name
         }
 
-#------------------(pendiente borrar si ya no se usa)
-# class State(enum.Enum):
-#     TODO = "To Do"
-#     IN_PROGRESS = "In Progress"
-#     DONE = "Done"
 
 class Card(db.Model):
     __tablename__="cards"

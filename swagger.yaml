@@ -13,6 +13,9 @@ info:
     - **Usuarios**: Búsqueda y gestión de miembros
     - **Mensajes**: Sistema básico de mensajería (ejemplo/prueba)
     - **Notificaciones**: Sistema de notificaciones en tiempo real.
+    - **Listas**: Sistema de organización de tareas dentro de un tablero.
+    - **Subtareas**: Tareas puntuales contenidas dentro de cada tarjeta
+    - **Comentarios**: Sistema de comentarios entre los miembros de un tablero.
 
     ## Autenticación
     La API utiliza JWT (JSON Web Tokens) para la autenticación. Los endpoints protegidos requieren
@@ -37,7 +40,7 @@ info:
 servers:
   - url: http://localhost:5000
     description: Servidor de desarrollo local
-  - url: https://your-production-url.com
+  - url: http://localhost:3000
     description: Servidor de producción
 # PATHS: ENDPOINTS DE LA API=============================================================================
 paths:
@@ -350,7 +353,7 @@ paths:
       requestBody:
         required: true
         content:
-          multipart/form-data
+          multipart/form-data:
             schema:
               type: object
               required:
@@ -923,10 +926,15 @@ paths:
                   description: Fecha de vencimiento
                 state:
                   type: string
-                  enum: [TODO, IN_PROGRESS, DONE]
                   default: TODO
                   example: "TODO"
                   description: Estado de la tarjeta
+                priority:
+                  type: string
+                  nullable: true
+                  enum: [Baja, Media, Alta]
+                  example: "Media"
+                  description: Prioridad de la tarjeta
       responses:
         "201":
           description: Tarjeta creada exitosamente
@@ -1079,13 +1087,18 @@ paths:
                   example: "2024-01-25T18:00:00"
                 state:
                   type: string
-                  enum: [TODO, IN_PROGRESS, DONE]
                   example: "IN_PROGRESS"
                 tags:
                   type: array
                   items:
                     type: string
                   example: ["urgente", "backend"]
+                priority:
+                  type: string
+                  nullable: true
+                  enum: [Baja, Media, Alta]
+                  example: "Media"
+                  description: Prioridad de la tarjeta
       responses:
         "200":
           description: Tarjeta actualizada exitosamente
@@ -1297,6 +1310,60 @@ paths:
                   $ref: "#/components/schemas/User"
         "404":
           description: Tarjeta no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /card/move/{card_id}:
+    patch:
+      tags:
+        - Tarjetas
+      summary: Mover tarjeta a otra lista
+      description: Cambia la lista y el estado de una tarjeta específica dentro de un tablero.
+      operationId: moveCard
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: card_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta a mover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - toListId
+              properties:
+                toListId:
+                  type: integer
+                  example: 2
+                  description: ID de la lista destino
+      responses:
+        "200":
+          description: Tarjeta movida exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "404":
+          description: Tarjeta o lista destino no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Usuario no autorizado
           content:
             application/json:
               schema:
@@ -1552,55 +1619,162 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  # ============ NOTIFICACIONES ============
-  /notifications:
-    post:
-      tags:
-        - Notifications
-      summary: Crear una nueva notificación
-      requestBody:
-        required: true
+  # ============ NOTIFICACIONES REALTIME ============
+/notifications:
+  get:
+    tags:
+      - Notifications (Realtime)
+    summary: Obtener notificaciones en tiempo real del usuario
+    description: Obtiene notificaciones que aparecen directamente en la aplicación. Permite filtrar solo no leídas y paginar con `limit` y `offset`.
+    operationId: getRealtimeNotifications
+    security:
+      - BearerAuth: []
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+        description: Número máximo de notificaciones a retornar
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+        description: Offset para paginación
+      - name: unread_only
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+        description: Si es true, solo retorna notificaciones no leídas
+    responses:
+      "200":
+        description: Lista de notificaciones realtime
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateNotificationRequest"
-      responses:
-        "201":
-          description: Notificación creada correctamente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Notification"
-        "400":
-          description: Error en la solicitud
-        "500":
-          description: Error interno del servidor
+              type: object
+              properties:
+                notifications:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Notification"
+                meta:
+                  type: object
+                  properties:
+                    total_count:
+                      type: integer
+                    unread_count:
+                      type: integer
+                    limit:
+                      type: integer
+                    offset:
+                      type: integer
+      "500":
+        description: Error interno del servidor
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
 
-  /notifications/{userId}:
-    get:
-      tags:
-        - Notifications
-      summary: Obtener todas las notificaciones de un usuario
-      parameters:
-        - name: userId
-          in: path
-          required: true
+  post:
+    tags:
+      - Notifications (Realtime)
+    summary: Crear notificación realtime
+    description: Crea una notificación que aparece directamente en la app. `sendEmailAlso` debe ser false.
+    operationId: createRealtimeNotification
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
           schema:
-            type: integer
-          description: ID del usuario
-      responses:
-        "200":
-          description: Lista de notificaciones
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Notification"
-        "404":
-          description: Usuario no encontrado
-        "500":
-          description: Error interno del servidor
+            $ref: "#/components/schemas/CreateNotificationRequest"
+            example:
+              userId: 123
+              type: "TASK_ASSIGNED"
+              title: "Nueva tarea asignada"
+              message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
+              resourceKind: "task"
+              resourceId: 456
+              actorId: 1
+              sendEmailAlso: false
+    responses:
+      "201":
+        description: Notificación creada correctamente
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Notification"
+      "400":
+        description: Error en la solicitud
+      "500":
+        description: Error interno del servidor
+
+    # ============ NOTIFICACIONES POR EMAIL ============
+/notifications/test-email:
+  post:
+    tags:
+      - Notifications (Email)
+    summary: Crear notificación por correo
+    description: Crea y envía una notificación al email del usuario. Incluye enlaces a la app según `resourceKind` y `resourceId`.
+    operationId: createEmailNotification
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CreateNotificationRequest"
+            example:
+              userId: 123
+              type: "TASK_ASSIGNED_EMAIL"
+              title: "Nueva tarea asignada"
+              message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
+              resourceKind: "task"
+              resourceId: 456
+              actorId: 1
+              userEmail: "usuario@correo.com"
+              sendEmailAlso: true
+    responses:
+      "201":
+        description: Notificación enviada por email
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Email de prueba enviado"
+                notification_id:
+                  type: string
+                  format: uuid
+                  example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                email_sent_to:
+                  type: string
+                  example: "usuario@correo.com"
+                resource_kind:
+                  type: string
+                  example: "task"
+                resource_id:
+                  type: integer
+                  example: 456
+                generated_url:
+                  type: string
+                  example: "http://localhost:3000/task/456"
+      "400":
+        description: Error en la solicitud
+      "404":
+        description: Usuario no encontrado
+      "500":
+        description: Error interno del servidor
 
   # ============ MENSAJES ============
   /message:
@@ -1826,7 +2000,6 @@ components:
           description: Fecha de vencimiento de la tarjeta
         state:
           type: string
-          enum: [TODO, IN_PROGRESS, DONE]
           example: "TODO"
           description: Estado actual de la tarjeta
         boardId:
@@ -2008,11 +2181,60 @@ components:
         sendEmailAlso:
           type: boolean
           default: true
+          description: Indica si se debe enviar también por correo. Para notificaciones realtime normalmente false.
+
       required:
         - userId
         - type
         - title
         - message
+
+    CreateEmailNotificationRequest:
+      type: object
+      properties:
+        userId:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        resourceKind:
+          type: string
+          nullable: true
+        resourceId:
+          type: integer
+          nullable: true
+        actorId:
+          type: integer
+          nullable: true
+        eventId:
+          type: string
+          nullable: true
+        userEmail:
+          type: string
+          description: Email del usuario receptor
+        sendEmailAlso:
+          type: boolean
+          default: true
+          description: Siempre true para notificaciones por correo
+      required:
+        - userId
+        - type
+        - title
+        - message
+        - userEmail
+      example:
+        userId: 123
+        type: "TASK_ASSIGNED"
+        title: "Nueva tarea asignada"
+        message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
+        resourceKind: "task"
+        resourceId: 456
+        actorId: 1
+        userEmail: "usuario@correo.com"
+        sendEmailAlso: true
 
 #TAGS: AGRUPACIONES DESCRIPTIVAS DE ENDPOINTS===========================================================
 tags:
