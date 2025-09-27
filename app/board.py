@@ -55,6 +55,17 @@ def create_board():
         name = request.form.get("name")
         description = request.form.get("description", "")
         is_public = request.form.get("isPublic", "false").lower() == "true"
+        
+        # Validación server-side para name
+        if not name or not name.strip():
+            return jsonify({"error": "Board name is required"}), 400
+        
+        name = name.strip()
+        
+        # Validación de unicidad: verificar si ya existe un tablero con el mismo nombre para este usuario
+        existing_board = Board.query.filter_by(user_id=user.id, name=name).first()
+        if existing_board:
+            return jsonify({"error": "You already have a board with this name"}), 400
 
         # Recibir archivo de imagen
         image_file = request.files.get("image")
@@ -192,19 +203,24 @@ def add_member_to_board(board_id):
 @jwt_required()
 def get_board_by_id(board_id):
     try:
-        user_id=get_jwt_identity()
-        user= User.query.get(user_id)
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         if not user:
-            return jsonify({"Error":"Usuario no encontrado"}),404
-        board=Board.query.get(board_id)
+            return jsonify({"Error": "Usuario no encontrado"}), 404
+        
+        board = Board.query.get(board_id)
         if not board:
-            return jsonify({"Error":"Tablero no encontrado"}),404
-        if user not in board.members and not board.is_public:
+            return jsonify({"Error": "Tablero no encontrado"}), 404
+        
+        # Control de acceso: verificar si el usuario puede ver este tablero
+        is_member = any(member.id == user.id for member in board.members)
+        
+        if not board.is_public and not is_member:
             return jsonify({"Error": "No tienes acceso a este tablero"}), 403
         
         return jsonify(board.serialize()), 200
     except Exception as error:
-        return jsonify({"Error":str(error)}),500
+        return jsonify({"Error": str(error)}), 500
 
 #AÑADIR TABLERO A FAVORITOS-------------------------------------------------------------------------------------------------------
 @board_bp.route("/favoriteBoard/<int:board_id>",methods=["POST"])

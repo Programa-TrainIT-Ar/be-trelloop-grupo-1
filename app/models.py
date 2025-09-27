@@ -136,11 +136,12 @@ class Card(db.Model):
     creation_date = db.Column(db.DateTime, nullable=False)
     begin_date = db.Column(db.DateTime, nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
-    state = db.Column(db.String(255), nullable=False, default='To Do') 
+    state = db.Column(db.String(255), nullable=False, default='TO DO') 
     board_id = db.Column(db.Integer, db.ForeignKey("boards.id"), nullable=False)
     list_id = db.Column(db.Integer, db.ForeignKey("lists.id", ondelete="SET NULL"), nullable=True, index=True)
     priority = db.Column(db.String(20), nullable=True)
 
+    position= db.Column(db.Integer,nullable=True, default=0)
     tags = db.relationship('Tag', secondary='card_tag_association', backref='cards')
     members = db.relationship('User', secondary='card_user_association', backref='cards')
     list = db.relationship("List", backref="cards")
@@ -169,7 +170,7 @@ class Card(db.Model):
 class Notification(db.Model):
     __tablename__ = "notifications"
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Tipo y contenido
