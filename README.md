@@ -15,9 +15,7 @@ conda activate trello-clone-grupo-1
 
 4. Instalar dependencias:
    
-pip install pipenv
-
-pipenv install
+pip install -r requirements.txt
 
 5. Ejecutar migraciones:
    
