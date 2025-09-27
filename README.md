@@ -1,5 +1,5 @@
 # Proyecto Trello Clone Grupo 1:
-Sigue estos pasos para preparar el proyecto en tu entorno local:
+## Sigue estos pasos para preparar el proyecto en tu entorno local:
 
 1. Inicializar una carpera en blanco, en ella:
    
@@ -30,4 +30,5 @@ flask db migrate
 flask db upgrade
 
 6. Levantar servidor:
+   
 python -m app.main
