@@ -2,25 +2,25 @@
 Sigue estos pasos para preparar el proyecto en tu entorno local:
 
 1. Inicializar una carpera en blanco, en ella:
-2. 
+   
 git clone https://github.com/Programa-TrainIT-Ar/be-trelloop-grupo-1 .
 
-3. Crear un entorno virtual:
-4. 
+2. Crear un entorno virtual:
+   
 conda create -n trello-clone-grupo-1 python=3.10
 
-5. Activar el entorno virtual:
-6. 
+3. Activar el entorno virtual:
+   
 conda activate trello-clone-grupo-1
 
-7. Instalar dependencias:
-8. 
+4. Instalar dependencias:
+   
 pip install pipenv
 
 pipenv install
 
-6. Ejecutar migraciones:
-7. 
+5. Ejecutar migraciones:
+   
 export FLASK_APP=app:create_app
 
 flask db init
@@ -29,5 +29,5 @@ flask db migrate
 
 flask db upgrade
 
-8. Levantar servidor:
+6. Levantar servidor:
 python -m app.main
