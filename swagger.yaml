@@ -1620,161 +1620,161 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   # ============ NOTIFICACIONES REALTIME ============
-/notifications:
-  get:
-    tags:
-      - Notifications (Realtime)
-    summary: Obtener notificaciones en tiempo real del usuario
-    description: Obtiene notificaciones que aparecen directamente en la aplicación. Permite filtrar solo no leídas y paginar con `limit` y `offset`.
-    operationId: getRealtimeNotifications
-    security:
-      - BearerAuth: []
-    parameters:
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          default: 20
-        description: Número máximo de notificaciones a retornar
-      - name: offset
-        in: query
-        required: false
-        schema:
-          type: integer
-          default: 0
-        description: Offset para paginación
-      - name: unread_only
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-        description: Si es true, solo retorna notificaciones no leídas
-    responses:
-      "200":
-        description: Lista de notificaciones realtime
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                notifications:
-                  type: array
-                  items:
-                    $ref: "#/components/schemas/Notification"
-                meta:
-                  type: object
-                  properties:
-                    total_count:
-                      type: integer
-                    unread_count:
-                      type: integer
-                    limit:
-                      type: integer
-                    offset:
-                      type: integer
-      "500":
-        description: Error interno del servidor
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ErrorResponse"
-
-  post:
-    tags:
-      - Notifications (Realtime)
-    summary: Crear notificación realtime
-    description: Crea una notificación que aparece directamente en la app. `sendEmailAlso` debe ser false.
-    operationId: createRealtimeNotification
-    security:
-      - BearerAuth: []
-    requestBody:
-      required: true
-      content:
-        application/json:
+  /notifications:
+    get:
+      tags:
+        - Notificaciones (realtime)
+      summary: Obtener notificaciones en tiempo real del usuario
+      description: Obtiene notificaciones que aparecen directamente en la aplicación. Permite filtrar solo no leídas y paginar con `limit` y `offset`.
+      operationId: getRealtimeNotifications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
           schema:
-            $ref: "#/components/schemas/CreateNotificationRequest"
-            example:
-              userId: 123
-              type: "TASK_ASSIGNED"
-              title: "Nueva tarea asignada"
-              message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
-              resourceKind: "task"
-              resourceId: 456
-              actorId: 1
-              sendEmailAlso: false
-    responses:
-      "201":
-        description: Notificación creada correctamente
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Notification"
-      "400":
-        description: Error en la solicitud
-      "500":
-        description: Error interno del servidor
-
-    # ============ NOTIFICACIONES POR EMAIL ============
-/notifications/test-email:
-  post:
-    tags:
-      - Notifications (Email)
-    summary: Crear notificación por correo
-    description: Crea y envía una notificación al email del usuario. Incluye enlaces a la app según `resourceKind` y `resourceId`.
-    operationId: createEmailNotification
-    security:
-      - BearerAuth: []
-    requestBody:
-      required: true
-      content:
-        application/json:
+            type: integer
+            default: 20
+          description: Número máximo de notificaciones a retornar
+        - name: offset
+          in: query
+          required: false
           schema:
-            $ref: "#/components/schemas/CreateNotificationRequest"
-            example:
-              userId: 123
-              type: "TASK_ASSIGNED_EMAIL"
-              title: "Nueva tarea asignada"
-              message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
-              resourceKind: "task"
-              resourceId: 456
-              actorId: 1
-              userEmail: "usuario@correo.com"
-              sendEmailAlso: true
-    responses:
-      "201":
-        description: Notificación enviada por email
+            type: integer
+            default: 0
+          description: Offset para paginación
+        - name: unread_only
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Si es true, solo retorna notificaciones no leídas
+      responses:
+        "200":
+          description: Lista de notificaciones realtime
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  meta:
+                    type: object
+                    properties:
+                      total_count:
+                        type: integer
+                      unread_count:
+                        type: integer
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Notificaciones (realtime)
+      summary: Crear notificación realtime
+      description: Crea una notificación que aparece directamente en la app. `sendEmailAlso` debe ser false.
+      operationId: createRealtimeNotification
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  example: "Email de prueba enviado"
-                notification_id:
-                  type: string
-                  format: uuid
-                  example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-                email_sent_to:
-                  type: string
-                  example: "usuario@correo.com"
-                resource_kind:
-                  type: string
-                  example: "task"
-                resource_id:
-                  type: integer
-                  example: 456
-                generated_url:
-                  type: string
-                  example: "http://localhost:3000/task/456"
-      "400":
-        description: Error en la solicitud
-      "404":
-        description: Usuario no encontrado
-      "500":
-        description: Error interno del servidor
+              $ref: "#/components/schemas/CreateNotificationRequest"
+              example:
+                userId: 123
+                type: "TASK_ASSIGNED"
+                title: "Nueva tarea asignada"
+                message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
+                resourceKind: "task"
+                resourceId: 456
+                actorId: 1
+                sendEmailAlso: false
+      responses:
+        "201":
+          description: Notificación creada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "400":
+          description: Error en la solicitud
+        "500":
+          description: Error interno del servidor
+
+      # ============ NOTIFICACIONES POR EMAIL ============
+  /notifications/test-email:
+    post:
+      tags:
+        - Notificaciones (email)
+      summary: Crear notificación por correo
+      description: Crea y envía una notificación al email del usuario. Incluye enlaces a la app según `resourceKind` y `resourceId`.
+      operationId: createEmailNotification
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationRequest"
+              example:
+                userId: 123
+                type: "TASK_ASSIGNED_EMAIL"
+                title: "Nueva tarea asignada"
+                message: "Se te ha asignado la tarea 'Preparar reporte mensual'"
+                resourceKind: "task"
+                resourceId: 456
+                actorId: 1
+                userEmail: "usuario@correo.com"
+                sendEmailAlso: true
+      responses:
+        "201":
+          description: Notificación enviada por email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email de prueba enviado"
+                  notification_id:
+                    type: string
+                    format: uuid
+                    example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                  email_sent_to:
+                    type: string
+                    example: "usuario@correo.com"
+                  resource_kind:
+                    type: string
+                    example: "task"
+                  resource_id:
+                    type: integer
+                    example: 456
+                  generated_url:
+                    type: string
+                    example: "http://localhost:3000/task/456"
+        "400":
+          description: Error en la solicitud
+        "404":
+          description: Usuario no encontrado
+        "500":
+          description: Error interno del servidor
 
   # ============ MENSAJES ============
   /message:
@@ -1853,6 +1853,391 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+    # ============ LISTAS ============
+  /lists/by-board/{boardId}:
+    get:
+      summary: Obtener listas de un tablero
+      tags:
+        - Listas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          description: ID del tablero
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Listas obtenidas correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/List"
+        "403":
+          description: Sin acceso al tablero
+        "404":
+          description: Tablero no encontrado
+        "500":
+          description: Error interno
+
+  /lists/create:
+    post:
+      summary: Crear una nueva lista en un tablero
+      tags:
+        - Listas
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListCreateRequest"
+      responses:
+        "201":
+          description: Lista creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/List"
+        "400":
+          description: Parámetros inválidos
+        "403":
+          description: Debes ser miembro del tablero
+        "404":
+          description: Tablero no encontrado
+        "409":
+          description: Ya existe una lista con ese nombre
+        "500":
+          description: Error interno
+
+  /lists/{listId}:
+    delete:
+      summary: Eliminar una lista
+      tags:
+        - Listas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          description: ID de la lista
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista eliminada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        "403":
+          description: Debes ser miembro del tablero o no tienes permisos
+        "404":
+          description: Lista no encontrada
+        "500":
+          description: Error interno
+
+    # ============ SUBTAREAS ============
+  paths:
+  /subtasks/createSubtask:
+    post:
+      summary: Crear una subtask
+      tags:
+        - Subtareas
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubtaskCreateRequest"
+      responses:
+        "201":
+          description: Subtask creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subtask"
+        "400":
+          description: Parámetros obligatorios faltantes
+        "500":
+          description: Error interno
+
+  /subtasks/cards/{cardId}/subtasks:
+    get:
+      summary: Obtener todas las subtasks activas de una card
+      tags:
+        - Subtareas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          description: ID de la tarjeta
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de subtasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subtask"
+
+  /subtasks/getSubtask/{id}:
+    get:
+      summary: Obtener una subtask por ID
+      tags:
+        - Subtareas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la subtask
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subtask encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subtask"
+        "404":
+          description: Subtask no encontrada
+
+  /subtasks/updateSubtask/{id}:
+    put:
+      summary: Actualizar una subtask
+      tags:
+        - Subtareas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la subtask
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubtaskUpdateRequest"
+      responses:
+        "200":
+          description: Subtask actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subtask"
+        "404":
+          description: Subtask no encontrada
+        "500":
+          description: Error interno
+
+  /subtasks/inactivateSubtask/{id}:
+    patch:
+      summary: Inactivar (soft delete) una subtask
+      tags:
+        - Subtareas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la subtask
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subtask inactivada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Subtarea eliminada con éxito"
+        "404":
+          description: Subtask no encontrada o ya eliminada
+        "500":
+          description: Error interno
+
+    # ============ COMENTARIOS ============
+
+  /comments/create:
+    post:
+      summary: Crear un comentario
+      tags:
+        - Comentarios
+      description: Crea un nuevo comentario en una tarjeta.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cardId:
+                  type: integer
+                  example: 10
+                  description: ID de la tarjeta donde se crea el comentario
+                content:
+                  type: string
+                  example: "Este es un comentario de prueba"
+                  description: Texto del comentario
+                parentId:
+                  type: integer
+                  nullable: true
+                  example: 2
+                  description: ID del comentario padre si es una respuesta
+              required:
+                - cardId
+                - content
+      responses:
+        "201":
+          description: Comentario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Parámetros inválidos
+        "403":
+          description: No autorizado para crear comentario en la tarjeta
+        "404":
+          description: Tarjeta no encontrada
+
+  /comments/list:
+    get:
+      summary: Listar comentarios de una tarjeta
+      tags:
+        - Comentarios
+      description: Obtiene todos los comentarios asociados a una tarjeta.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: cardId
+          required: true
+          schema:
+            type: integer
+          description: ID de la tarjeta
+        - in: query
+          name: include_deleted
+          required: false
+          schema:
+            type: boolean
+            example: false
+          description: Incluir comentarios eliminados
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+          description: Número máximo de resultados
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+          description: Desplazamiento de resultados
+      responses:
+        "200":
+          description: Lista de comentarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 25
+                      limit:
+                        type: integer
+                        example: 100
+                      offset:
+                        type: integer
+                        example: 0
+        "400":
+          description: Falta el parámetro cardId
+        "403":
+          description: No autorizado para ver comentarios de la tarjeta
+        "404":
+          description: Tarjeta no encontrada
+
+  /comments/update/{commentId}:
+    put:
+      summary: Editar un comentario
+      tags:
+        - Comentarios
+      description: Edita un comentario existente (solo el autor puede hacerlo).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: integer
+          description: ID del comentario a actualizar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  example: "Comentario actualizado"
+              required:
+                - content
+      responses:
+        "200":
+          description: Comentario actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Error en la validación de datos o comentario eliminado
+        "403":
+          description: No autorizado para editar es
 
 # COMPONENTS/SCHEMAS: MODELOS DE DATOS REUTILIZABLES======================================================
 components:
@@ -2236,6 +2621,146 @@ components:
         userEmail: "usuario@correo.com"
         sendEmailAlso: true
 
+    List:
+      type: object
+      description: Modelo de lista dentro de un tablero
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único de la lista
+        name:
+          type: string
+          example: "Tareas pendientes"
+          description: Nombre de la lista
+        boardId:
+          type: integer
+          example: 1
+          description: ID del tablero al que pertenece la lista
+        position:
+          type: integer
+          example: 1
+          description: Posición de la lista dentro del tablero
+        creationDate:
+          type: string
+          format: date-time
+          example: "2024-02-01T12:00:00Z"
+          description: Fecha de creación de la lista
+      required:
+        - id
+        - name
+        - boardId
+        - position
+
+    Subtask:
+      type: object
+      description: Modelo de subtarea asociada a una tarjeta
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único de la subtarea
+        title:
+          type: string
+          example: "Definir endpoints de autenticación"
+          description: Título o nombre de la subtarea
+        description:
+          type: string
+          nullable: true
+          example: "Investigar JWT y definir endpoints de login y registro"
+          description: Descripción detallada de la subtarea
+        isCompleted:
+          type: boolean
+          example: false
+          description: Indica si la subtarea está completada
+        cardId:
+          type: integer
+          example: 5
+          description: ID de la tarjeta a la que pertenece la subtarea
+        creationDate:
+          type: string
+          format: date-time
+          example: "2024-03-01T09:30:00Z"
+          description: Fecha de creación de la subtarea
+      required:
+        - id
+        - title
+        - isCompleted
+        - cardId
+
+    Comment:
+      type: object
+      description: Modelo de comentario asociado a una tarjeta
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: ID único del comentario
+        cardId:
+          type: integer
+          example: 10
+          description: ID de la tarjeta a la que pertenece el comentario
+        userId:
+          type: integer
+          example: 5
+          description: ID del usuario que creó el comentario
+        user:
+          $ref: "#/components/schemas/User"
+          description: Datos del usuario que hizo el comentario
+        parentId:
+          type: integer
+          nullable: true
+          example: 2
+          description: ID del comentario padre (si es una respuesta)
+        content:
+          type: string
+          nullable: true
+          example: "Este es un comentario de prueba"
+          description: Contenido del comentario (puede ser null si fue eliminado)
+        placeholder:
+          type: string
+          nullable: true
+          example: "Comentario eliminado"
+          description: Texto de reemplazo mostrado cuando el comentario fue eliminado
+        isEdited:
+          type: boolean
+          example: false
+          description: Indica si el comentario fue editado
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-04-01T12:30:00Z"
+          description: Fecha de creación del comentario
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-04-02T09:45:00Z"
+          description: Fecha de última edición del comentario
+        deleted:
+          type: boolean
+          example: false
+          description: Indica si el comentario fue eliminado
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-04-03T10:15:00Z"
+          description: Fecha de eliminación del comentario
+        deletedBy:
+          type: integer
+          nullable: true
+          example: 7
+          description: ID del usuario que eliminó el comentario
+      required:
+        - id
+        - cardId
+        - userId
+        - content
+        - isEdited
+        - createdAt
+        - deleted
+
 #TAGS: AGRUPACIONES DESCRIPTIVAS DE ENDPOINTS===========================================================
 tags:
   - name: Autenticación
@@ -2291,21 +2816,64 @@ tags:
       Endpoints para gestión de mensajes básicos.
       **Nota**: Estos son endpoints de ejemplo/prueba para validar la funcionalidad básica de la API.
 
-  - name: Notificaciones
+  - name: Notificaciones (realtime)
     description: |
-      Endpoints para la gestión completa de notificaciones de usuarios.
+      Endpoints para la gestión de notificaciones en tiempo real dentro de la aplicación.
 
       ### Funcionalidades principales:
       1. **Crear notificación**: POST /notifications - Genera una nueva notificación para un usuario.  
-         Soporta envío opcional por email y asegura idempotencia mediante `eventId`.
+         Se asegura idempotencia mediante `eventId`.
       2. **Listar notificaciones**: GET /notifications/{userId} - Obtiene todas las notificaciones de un usuario.
       3. **Estado de lectura**: Las notificaciones tienen un campo `read` que indica si fueron leídas.
       4. **Recursos relacionados**: Las notificaciones pueden estar asociadas a un recurso (`board`, `card`, etc.) para redirigir al frontend.
 
       ### Consideraciones:
-      - Para el envío de emails, se usa `userEmail` y `sendEmailAlso` en la creación.
-      - Los `eventId` permiten que una misma acción no genere múltiples notificaciones.
-      - El frontend puede usar el campo `resource` para generar links a tableros o tarjetas específicas.
+      - Uso recomendado para alertas en la UI.
+      - El frontend puede usar el campo `resource` para generar links directos a tableros o tarjetas.
+
+  - name: Notificaciones (email)
+    description: |
+      Endpoints para el envío de notificaciones por correo electrónico.
+
+      ### Funcionalidades principales:
+      1. **Enviar notificación por email**: POST /notifications con `sendEmailAlso=true` - Envía un correo al usuario además de la notificación en la app.
+      2. **Soporte de destinatarios**: Requiere `userEmail` en la creación.
+      3. **Prevención de duplicados**: Uso de `eventId` para asegurar que una misma acción no genere múltiples correos.
+
+      ### Consideraciones:
+      - Se utiliza como complemento a las notificaciones en tiempo real.
+      - Útil para avisos importantes (ejemplo: invitaciones, cambios de estado críticos).
+      - Puede coexistir con la notificación en la aplicación o enviarse de forma independiente.
+
+  - name: Listas
+    description: |
+      Endpoints para la gestión de listas dentro de los tableros.
+
+      ### Funcionalidades principales:
+      - Crear, leer, actualizar y eliminar listas
+      - Ordenar listas dentro de un tablero
+      - Relación directa con tarjetas
+      - Cada lista pertenece a un único tablero
+
+  - name: Subtareas
+    description: |
+      Endpoints para la gestión de subtareas asociadas a tarjetas.
+
+      ### Características:
+      - Crear, leer, actualizar y eliminar subtareas
+      - Cambiar estado de completado (true/false)
+      - Cada subtarea pertenece a una tarjeta
+      - Soporte de fechas de vencimiento
+
+  - name: Comentarios
+    description: |
+      Endpoints para la gestión de comentarios dentro de las tarjetas.
+
+      ### Funcionalidades:
+      - Crear, leer y eliminar comentarios
+      - Asociar comentarios a tarjetas
+      - Guardar información del autor y fecha de creación
+      - Soporte para edición de comentarios
 
 externalDocs:
   description: Repositorio del proyecto en GitHub
