@@ -1,0 +1,425 @@
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS, cross_origin
+from datetime import datetime
+from .models import db, Board, Card, User, List
+from .services.notifications import create_notification
+from .services.pusher_client import get_pusher_client
+import uuid
+from sqlalchemy import func
+
+
+
+card_bp = Blueprint("card", __name__)
+CORS(card_bp)
+
+@card_bp.before_request
+def handle_options_request():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+# CREAR TARJETAS-------------------------------------------------------------------------------------------------------
+@card_bp.route('/createCard', methods=['POST'])
+@jwt_required()
+def create_card():
+    try:
+        user_id = get_jwt_identity()  
+        data = request.get_json() or {}
+
+        title          = data.get('title')
+        description    = data.get('description')
+        board_id       = data.get('boardId')
+        responsable_id = data.get('responsableId')
+        begin_date     = data.get('beginDate')
+        due_date       = data.get('dueDate')
+        list_id        = data.get('listId')                      
+        list_name      = (data.get('listName') or '').strip()   
+        state          = (data.get('state') or '').strip()       
+        priority       = data.get("priority")
+
+        if priority not in (None, "Baja", "Media", "Alta"):
+            priority = None
+        
+
+        if not title or not board_id:
+            return jsonify({"error": "El título y el ID del tablero son obligatorios"}), 400
+
+        board = Board.query.get(board_id)
+        if not board:
+            return jsonify({"error": "El tablero no existe"}), 404
+
+        target_list = None
+        if list_id:
+            target_list = List.query.filter_by(id=list_id, board_id=board_id).first()
+            if not target_list:
+                return jsonify({"error": "La lista indicada no existe en este tablero"}), 400
+
+        elif list_name:
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == list_name.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=list_name,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()  
+
+        elif state:
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == state.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=state,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()
+
+        else:
+            default_name = "Pendiente"
+            target_list = List.query.filter(
+                List.board_id == board_id,
+                func.lower(List.name) == default_name.lower()
+            ).first()
+            if not target_list:
+                max_pos = db.session.query(func.coalesce(func.max(List.position), 0)).filter_by(board_id=board_id).scalar()
+                target_list = List(
+                    board_id=board_id,
+                    name=default_name,
+                    position=int(max_pos) + 1,
+                    created_by=user_id if str(user_id).isdigit() else None
+                )
+                db.session.add(target_list)
+                db.session.flush()
+
+        new_card = Card(
+            title=title,
+            description=description,
+            responsable_id=responsable_id,
+            creation_date=datetime.utcnow(),
+            begin_date=datetime.fromisoformat(begin_date) if begin_date else None,
+            due_date=datetime.fromisoformat(due_date) if due_date else None,
+            board_id=board_id,
+            list_id=target_list.id,      
+            state=target_list.name,
+            priority=priority or auto_priority        
+        )
+
+        db.session.add(new_card)
+        db.session.commit()
+
+        if responsable_id:
+            try:
+                event_id = f"card:{new_card.id}:assigned:{responsable_id}"
+                assignee = User.query.get(responsable_id)
+                if assignee:
+                    create_notification(
+                        db.session,
+                        user_id=str(assignee.id),
+                        type_="CARD_ASSIGNED",
+                        title="Te asignaron una tarjeta",
+                        message=f"Has sido asignado a la tarjeta '{new_card.title}' en el tablero '{board.name}'.",
+                        resource_kind="card",
+                        resource_id=str(new_card.id),
+                        actor_id=str(user_id),
+                        event_id=event_id,
+                        user_email=assignee.email,
+                        send_email_also=True
+                    )
+            except Exception as notif_err:
+                print(f"[Notification Error] {notif_err}")
+
+        return jsonify({"message": "Tarjeta creada correctamente", "card": new_card.serialize()}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# MOSTRAR TARJETAS DE UN TABLERO (TODOS)-------------------------------------------------------------------------------------------------------
+@card_bp.route("/getCards/<int:board_id>", methods=["GET"])
+@jwt_required()
+def get_all_cards(board_id):
+    try:
+        all_cards = Card.query.filter_by(board_id = board_id)
+        if not all_cards:
+            return jsonify({"Error": "Tablero no encontrado"}), 404
+        return jsonify([card.serialize() for card in all_cards]), 200
+    except Exception as error:
+        return jsonify({"error": "Se ha producido un error al obtener las tarjetas", "details": str(error)}), 500
+
+# MOSTRAR TARJETAS POR ID-------------------------------------------------------------------------------------------------------
+@card_bp.route("/getCard/<int:card_id>", methods=["GET"])
+@jwt_required()
+def get_card(card_id):
+    try:
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"Error": "Tarjeta no encontrada"}), 404
+        return jsonify(card.serialize()), 200
+    except Exception as error:
+        return jsonify({"error": "Se ha producido un error al obtener la tarjeta", "details": str(error)}), 500
+
+# ACTUALIZAR UNA TARJETA EXISTENTE----------------------------------------------------------------------------------------------
+@card_bp.route("/updateCard/<int:card_id>", methods=["PUT", "PATCH"])
+@jwt_required()
+def update_card(card_id):
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        # --- Campos básicos ---
+        if "title" in data:
+            card.title = data.get("title") or card.title
+
+        if "description" in data:
+            card.description = data.get("description") or None
+
+        if "responsableId" in data:
+            card.responsable_id = data.get("responsableId") or None
+
+        if "beginDate" in data:
+            bd = data.get("beginDate")
+            card.begin_date = datetime.fromisoformat(bd) if bd else None
+
+        if "dueDate" in data:
+            dd = data.get("dueDate")
+            card.due_date = datetime.fromisoformat(dd) if dd else None
+
+        # --- Prioridad (manual / opcional) ---
+        if "priority" in data:
+            pr = data.get("priority")
+            card.priority = pr if pr in ("Baja", "Media", "Alta") else None
+
+        # --- Movimiento por Lista (fuente de verdad del estado) ---
+        list_id = data.get("listId")
+        list_name = (data.get("listName") or "").strip()
+        board_id = data.get("boardId") or card.board_id
+
+        if list_id or list_name:
+            if list_id:
+                lst = List.query.filter_by(id=list_id, board_id=board_id).first()
+                if not lst:
+                    return jsonify({"error": "La lista no existe en este tablero"}), 404
+            else:
+                # Buscar por nombre (case-insensitive) o crear al vuelo
+                lst = List.query.filter(
+                    List.board_id == board_id,
+                    func.lower(List.name) == func.lower(list_name)
+                ).first()
+                if not lst:
+                    max_pos = db.session.query(
+                        func.coalesce(func.max(List.position), 0)
+                    ).filter(List.board_id == board_id).scalar() or 0
+
+                    lst = List(
+                        board_id=board_id,
+                        name=list_name,
+                        position=max_pos + 1,
+                        created_by=user_id
+                    )
+                    db.session.add(lst)
+                    db.session.flush()  # obtener lst.id
+
+            card.list_id = lst.id
+            # Compatibilidad con UIs antiguas que leen card.state
+            card.state = lst.name
+
+        # --- Compatibilidad legacy: permitir state directo si no vino lista ---
+        state_value = data.get("state")
+        if state_value and not (list_id or list_name):
+            card.state = state_value
+
+        # --- Etiquetas ---
+        if "tags" in data:
+            card.tags.clear()
+            for raw in data.get("tags") or []:
+                name = (raw or "").strip()
+                if not name:
+                    continue
+                tag = Tag.query.filter_by(name=name).first()
+                if not tag:
+                    tag = Tag(name=name)
+                    db.session.add(tag)
+                card.tags.append(tag)
+
+        db.session.commit()
+        return jsonify({"message": "Tarjeta actualizada correctamente", "card": card.serialize()}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        try:
+            current_app.logger.exception(f"[cards] update failed: {error}")
+        except Exception:
+            pass
+        return jsonify({"error": "Error al actualizar la tarjeta", "details": str(error)}), 500
+
+
+# ELIMINAR UNA TARJETA---------------------------------------------------------------------------------------------------------------
+@card_bp.route("/deleteCard/<int:card_id>", methods=["DELETE"])
+@jwt_required()
+def delete_card(card_id):
+    try:
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        db.session.delete(card)
+        db.session.commit()
+        return jsonify({"message": "Tarjeta eliminada correctamente"}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"error": "Error al eliminar la tarjeta", "details": str(error)}), 500
+
+# AGREGAR MIEMBROS A UNA TARJETA-------------------------------------------------------------------------------------------------------
+@card_bp.route('/addMembers/<int:card_id>', methods=['POST'])
+@jwt_required()
+def add_memember(card_id):
+    try:
+        current_user_id=get_jwt_identity()
+        user= User.query.get(current_user_id)
+        if not user:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+
+        data=request.get_json()
+        user_id=data.get("userId")
+        print(request.data)
+        print(request.get_json())
+
+        if not user_id:
+            return jsonify({"Warning":"Datos incompletos"}),400
+
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"Warning":"Tarjeta no encontrada"}),404
+
+        user_to_add = User.query.get(user_id)
+        if not user_to_add:
+            return jsonify({"Warning":"Usuario no encontrado"}),404
+        if user_to_add in card.members:
+            return jsonify({"Warning":"El usuario ya es miembro de la tarjeta"}),400
+
+        card.members.append(user_to_add)
+        db.session.commit()
+
+        # Crear notificación para el usuario agregado a la tarjeta
+        try:
+            event_id = f"card:{card_id}:member_added:{user_to_add.id}"
+            create_notification(
+                db.session,
+                user_id=str(user_to_add.id),
+                type_="CARD_ASSIGNED",
+                title="Te agregaron a una tarjeta",
+                message=f"{user.first_name} {user.last_name} te agregó a la tarjeta '{card.title}' en el tablero '{card.board.name}'.",
+                resource_kind="card",
+                resource_id=str(card.id),
+                actor_id=str(user.id),
+                event_id=event_id,
+                user_email=user_to_add.email,
+                send_email_also=True
+            )
+        except Exception as notif_err:
+            print(f"[Notification Error] {notif_err}")
+
+        return jsonify({"Message": "Miembro agregado correctamente"}), 200
+
+    except Exception as error:
+        db.session.rollback()
+        return jsonify({"Warning": str(error)}), 500
+
+# ELIMINAR MIEMBROS DE UNA TARJETA -----------------------------------------------------------
+@card_bp.route("/removeMember/<int:card_id>", methods=["DELETE"])
+@jwt_required()
+def remove_member_from_card(card_id):
+    try:
+        current_user_id = get_jwt_identity()
+        requester = User.query.get(current_user_id)
+        if not requester:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+
+        data = request.get_json() or {}
+        user_id = data.get("userId")
+        if not user_id:
+            return jsonify({"error": "Falta 'userId' en el cuerpo"}), 400
+
+        card = Card.query.get(card_id)
+        if not card:
+            return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+        user_to_remove = User.query.get(user_id)
+        if not user_to_remove:
+            return jsonify({"error": "Usuario a eliminar no encontrado"}), 404
+
+        if user_to_remove not in card.members:
+            return jsonify({"error": "El usuario no es miembro de esta tarjeta"}), 400
+
+        card.members.remove(user_to_remove)
+        db.session.commit()
+        return jsonify({"message": "Miembro eliminado correctamente"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# OBTENER MIEMBROS DE UNA TARJETA-------------------------------------------------------------------------------------------------------
+@card_bp.route("/getMembers/<int:card_id>", methods=['GET'])
+@jwt_required()
+def get_members(card_id):
+    try:
+        card=Card.query.get(card_id)
+        if not card:
+            return jsonify({"Warning":"Tarjeta no encontrada"}),404
+        members=[member.serialize() for member in card.members]
+        return jsonify(members),200
+    except Exception as error:
+        return jsonify({"Warning":str(error)}),500
+
+#Endpoint para mover tarjeta entre listas--------------------------------------------------------------------------------
+@card_bp.route("/move/<int:card_id>", methods=["PATCH"])
+@jwt_required()
+def move_card(card_id: int):
+    user_id = int(get_jwt_identity())
+    data = request.get_json() or {}
+    to_list_id = data.get("toListId")
+
+    card = Card.query.get(card_id)
+    if not card:
+        return jsonify({"error": "Tarjeta no encontrada"}), 404
+
+    board = card.board
+    if not board:
+        return jsonify({"error": "Tablero inválido"}), 400
+
+    # debe ser miembro del tablero
+    if not (board.user_id == user_id or any(m.id == user_id for m in board.members)):
+        return jsonify({"error": "No autorizado"}), 403
+
+    target_list = List.query.filter_by(id=to_list_id, board_id=board.id).first()
+    if not target_list:
+        return jsonify({"error": "Lista destino no encontrada"}), 404
+
+    card.list_id = target_list.id
+    card.state = target_list.name  # sincronía temporal
+    db.session.commit()
+
+    return jsonify(card.serialize()), 200
+
+
+# NOTA: El endpoint /pusher/auth se movió a main.py en la raíz de la aplicación
+# para coincidir con la configuración del frontend que espera /pusher/auth

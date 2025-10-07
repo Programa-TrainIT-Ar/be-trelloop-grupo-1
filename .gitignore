@@ -49,7 +49,7 @@ instance/
 
 # Swagger/OpenAPI (if generated)
 swagger.json
-swagger.yaml
+
 
 # ====================
 # 🧩 Node.js (React/Next.js Frontend)
