@@ -4,8 +4,8 @@ Flask-Migrate==4.0.5
 Flask-Cors==3.0.10
 flask-jwt-extended==4.6.0
 python-dotenv==1.0.0
-SQLAlchemy==2.0.20
-psycopg2-binary==2.9.9
+SQLAlchemy==1.4.49
+psycopg2-binary==2.9.10
 alembic==1.12.0
 
 bcrypt==4.0.1
