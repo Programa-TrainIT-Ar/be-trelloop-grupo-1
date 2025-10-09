@@ -120,8 +120,13 @@ def test_notification():
 
 @app.route("/message", methods=["POST"])
 def post_message():
-     data = request.json
-     msg = Message(content=data["content"])
+     data = request.json or {}
+     content = (data.get("content") or "").strip()
+     
+     if not content:
+         return jsonify({"error": "content es requerido y no puede estar vacío"}), 400
+     
+     msg = Message(content=content)
      db.session.add(msg)
      db.session.commit()
      return jsonify({"id": msg.id, "content": msg.content}), 201
